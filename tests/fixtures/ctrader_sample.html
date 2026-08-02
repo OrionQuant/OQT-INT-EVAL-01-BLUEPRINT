@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>cTrader - Account Statement</title>
+<style>
+body { font-family: Arial, sans-serif; }
+h1 { color: #1e3a8a; }
+.summary { margin: 16px 0; border: 1px solid #cbd5e1; padding: 10px; }
+table.history { border-collapse: collapse; width: 100%; font-size: 10pt; }
+table.history th, table.history td { border: 1px solid #94a3b8; padding: 4px 6px; }
+table.history th { background: #1e3a8a; color: #fff; text-align: left; }
+tr:nth-child(even) td { background: #f8fafc; }
+</style>
+</head>
+<body>
+<h1>cTrader Account Statement</h1>
+<div class="summary">
+  <div><strong>Account ID:</strong> 1234567</div>
+  <div><strong>Currency:</strong> USD</div>
+  <div><strong>Balance:</strong> 12 477.50 USD</div>
+  <div><strong>Symbol Contract Size (default):</strong> 100 000</div>
+</div>
+
+<h2>History</h2>
+<table class="history">
+<thead>
+<tr>
+  <th>Position</th><th>Deal</th><th>Symbol</th><th>Time</th><th>Type</th>
+  <th>Volume</th><th>Open Price</th><th>Close Price</th>
+  <th>Gross P&amp;L</th><th>Commission</th><th>Swap</th><th>Net P&amp;L</th><th>Balance</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>P1001</td><td>D1</td><td>EURUSD</td><td>2025-01-03 08:00:00</td><td>Buy</td><td>1.00</td><td>1.08000</td><td>1.08300</td><td>30.00</td><td>-3.00</td><td>-0.50</td><td>26.50</td><td>10026.50</td></tr>
+<tr><td>P1002</td><td>D2</td><td>GBPUSD</td><td>2025-01-06 09:30:00</td><td>Buy</td><td>1.00</td><td>1.26500</td><td>1.26200</td><td>-30.00</td><td>-3.00</td><td>-0.30</td><td>-33.30</td><td>9993.20</td></tr>
+<tr><td>P1003</td><td>D3</td><td>USDJPY</td><td>2025-01-09 14:15:00</td><td>Sell</td><td>1.00</td><td>145.00</td><td>144.30</td><td>70.00</td><td>-3.00</td><td>-0.20</td><td>66.80</td><td>10060.00</td></tr>
+<tr><td>P1004</td><td>D4</td><td>EURUSD</td><td>2025-01-14 10:05:00</td><td>Sell</td><td>0.50</td><td>1.08900</td><td>1.08600</td><td>15.00</td><td>-2.00</td><td>0.00</td><td>13.00</td><td>10073.00</td></tr>
+<tr><td>P1005</td><td>D5</td><td>XAUUSD</td><td>2025-01-20 16:45:00</td><td>Buy</td><td>0.10</td><td>2020.0</td><td>2030.0</td><td>100.00</td><td>-2.50</td><td>-0.80</td><td>96.70</td><td>10169.70</td></tr>
+<tr><td>P1006</td><td>D6</td><td>EURUSD</td><td>2025-01-23 11:10:00</td><td>Buy</td><td>1.00</td><td>1.09000</td><td>1.08920</td><td>-8.00</td><td>-3.00</td><td>-0.10</td><td>-11.10</td><td>10158.60</td></tr>
+<tr><td>P1007</td><td>D7</td><td>GBPUSD</td><td>2025-01-28 13:20:00</td><td>Sell</td><td>1.00</td><td>1.27000</td><td>1.26700</td><td>30.00</td><td>-3.00</td><td>-0.20</td><td>26.80</td><td>10185.40</td></tr>
+<tr><td>P1008</td><td>D8</td><td>USDJPY</td><td>2025-02-03 09:00:00</td><td>Buy</td><td>1.00</td><td>147.50</td><td>147.00</td><td>-50.00</td><td>-3.00</td><td>-0.30</td><td>-53.30</td><td>10132.10</td></tr>
+<tr><td>P1009</td><td>D9</td><td>EURUSD</td><td>2025-02-07 08:30:00</td><td>Buy</td><td>1.00</td><td>1.07800</td><td>1.08200</td><td>40.00</td><td>-3.00</td><td>-0.50</td><td>36.50</td><td>10168.60</td></tr>
+<tr><td>P1010</td><td>D10</td><td>XAUUSD</td><td>2025-02-11 15:00:00</td><td>Buy</td><td>0.20</td><td>2015.0</td><td>2000.0</td><td>-300.00</td><td>-3.00</td><td>-1.50</td><td>-304.50</td><td>9864.10</td></tr>
+<tr><td>P1011</td><td>D11</td><td>EURUSD</td><td>2025-02-18 10:00:00</td><td>Sell</td><td>1.00</td><td>1.08500</td><td>1.08300</td><td>20.00</td><td>-3.00</td><td>-0.20</td><td>16.80</td><td>9880.90</td></tr>
+<tr><td>P1012</td><td>D12</td><td>GBPUSD</td><td>2025-02-24 11:45:00</td><td>Buy</td><td>1.00</td><td>1.26500</td><td>1.27000</td><td>50.00</td><td>-3.00</td><td>-0.30</td><td>46.70</td><td>9927.60</td></tr>
+<tr><td>P1013</td><td>D13</td><td>USDJPY</td><td>2025-02-28 14:00:00</td><td>Sell</td><td>1.00</td><td>150.00</td><td>149.50</td><td>50.00</td><td>-3.00</td><td>-0.20</td><td>46.80</td><td>9974.40</td></tr>
+<tr><td>P1014</td><td>D14</td><td>EURUSD</td><td>2025-03-05 09:10:00</td><td>Buy</td><td>1.00</td><td>1.08200</td><td>1.08600</td><td>40.00</td><td>-3.00</td><td>-0.40</td><td>36.60</td><td>10011.00</td></tr>
+<tr><td>P1015</td><td>D15</td><td>EURUSD</td><td>2025-03-10 08:05:00</td><td>Buy</td><td>0.70</td><td>1.09200</td><td>1.09520</td><td>22.40</td><td>-2.50</td><td>-0.10</td><td>19.80</td><td>10030.80</td></tr>
+<tr><td>P1016</td><td>D16</td><td>XAUUSD</td><td>2025-03-14 16:00:00</td><td>Sell</td><td>0.10</td><td>2150.0</td><td>2140.0</td><td>100.00</td><td>-2.50</td><td>0.00</td><td>97.50</td><td>10128.30</td></tr>
+<tr><td>P1017</td><td>D17</td><td>GBPUSD</td><td>2025-03-19 13:40:00</td><td>Buy</td><td>1.00</td><td>1.27500</td><td>1.27100</td><td>-40.00</td><td>-3.00</td><td>-0.30</td><td>-43.30</td><td>10085.00</td></tr>
+<tr><td>P1018</td><td>D18</td><td>EURUSD</td><td>2025-03-25 10:15:00</td><td>Sell</td><td>1.00</td><td>1.08400</td><td>1.08000</td><td>40.00</td><td>-3.00</td><td>-0.20</td><td>36.80</td><td>10121.80</td></tr>
+<tr><td>P1019</td><td>D19</td><td>USDJPY</td><td>2025-03-31 08:30:00</td><td>Buy</td><td>1.00</td><td>151.00</td><td>151.40</td><td>40.00</td><td>-3.00</td><td>-0.20</td><td>36.80</td><td>10158.60</td></tr>
+<tr><td>P1020</td><td>D20</td><td>EURUSD</td><td>2025-04-04 11:30:00</td><td>Buy</td><td>1.00</td><td>1.07800</td><td>1.08400</td><td>60.00</td><td>-3.00</td><td>-0.40</td><td>56.60</td><td>10215.20</td></tr>
+<tr><td>P1021</td><td>D21</td><td>XAUUSD</td><td>2025-04-09 09:45:00</td><td>Buy</td><td>0.10</td><td>2280.0</td><td>2300.0</td><td>200.00</td><td>-2.50</td><td>-0.80</td><td>196.70</td><td>10411.90</td></tr>
+<tr><td>P1022</td><td>D22</td><td>GBPUSD</td><td>2025-04-15 14:20:00</td><td>Sell</td><td>1.00</td><td>1.26800</td><td>1.26500</td><td>30.00</td><td>-3.00</td><td>-0.20</td><td>26.80</td><td>10438.70</td></tr>
+<tr><td>P1023</td><td>D23</td><td>EURUSD</td><td>2025-04-22 08:10:00</td><td>Sell</td><td>1.00</td><td>1.07500</td><td>1.07300</td><td>20.00</td><td>-3.00</td><td>-0.20</td><td>16.80</td><td>10455.50</td></tr>
+<tr><td>P1024</td><td>D24</td><td>USDJPY</td><td>2025-04-28 15:40:00</td><td>Sell</td><td>1.00</td><td>155.00</td><td>155.50</td><td>-50.00</td><td>-3.00</td><td>-0.30</td><td>-53.30</td><td>10402.20</td></tr>
+<tr><td>P1025</td><td>D25</td><td>EURUSD</td><td>2025-05-02 10:00:00</td><td>Buy</td><td>1.00</td><td>1.07200</td><td>1.07800</td><td>60.00</td><td>-3.00</td><td>-0.40</td><td>56.60</td><td>10458.80</td></tr>
+<tr><td>P1026</td><td>D26</td><td>XAUUSD</td><td>2025-05-08 09:20:00</td><td>Buy</td><td>0.10</td><td>2305.0</td><td>2320.0</td><td>150.00</td><td>-2.50</td><td>-0.60</td><td>146.90</td><td>10605.70</td></tr>
+<tr><td>P1027</td><td>D27</td><td>GBPUSD</td><td>2025-05-14 13:05:00</td><td>Buy</td><td>1.00</td><td>1.27000</td><td>1.27500</td><td>50.00</td><td>-3.00</td><td>-0.20</td><td>46.80</td><td>10652.50</td></tr>
+<tr><td>P1028</td><td>D28</td><td>EURUSD</td><td>2025-05-20 08:30:00</td><td>Buy</td><td>1.00</td><td>1.08200</td><td>1.08500</td><td>30.00</td><td>-3.00</td><td>-0.30</td><td>26.70</td><td>10679.20</td></tr>
+<tr><td>P1029</td><td>D29</td><td>USDJPY</td><td>2025-05-27 11:15:00</td><td>Buy</td><td>1.00</td><td>157.00</td><td>156.40</td><td>-60.00</td><td>-3.00</td><td>-0.20</td><td>-63.20</td><td>10616.00</td></tr>
+<tr><td>P1030</td><td>D30</td><td>EURUSD</td><td>2025-06-02 15:00:00</td><td>Sell</td><td>1.00</td><td>1.08500</td><td>1.08200</td><td>30.00</td><td>-3.00</td><td>-0.20</td><td>26.80</td><td>10642.80</td></tr>
+<tr><td>P1031</td><td>D31</td><td>XAUUSD</td><td>2025-06-06 08:50:00</td><td>Sell</td><td>0.10</td><td>2350.0</td><td>2340.0</td><td>100.00</td><td>-2.50</td><td>0.00</td><td>97.50</td><td>10740.30</td></tr>
+<tr><td>P1032</td><td>D32</td><td>GBPUSD</td><td>2025-06-12 09:15:00</td><td>Sell</td><td>1.00</td><td>1.27300</td><td>1.26800</td><td>50.00</td><td>-3.00</td><td>-0.30</td><td>46.70</td><td>10787.00</td></tr>
+<tr><td>P1033</td><td>D33</td><td>EURUSD</td><td>2025-06-19 14:00:00</td><td>Buy</td><td>1.00</td><td>1.07500</td><td>1.07900</td><td>40.00</td><td>-3.00</td><td>-0.40</td><td>36.60</td><td>10823.60</td></tr>
+<tr><td>P1034</td><td>D34</td><td>USDJPY</td><td>2025-06-25 10:40:00</td><td>Sell</td><td>1.00</td><td>159.00</td><td>158.20</td><td>80.00</td><td>-3.00</td><td>-0.20</td><td>76.80</td><td>10900.40</td></tr>
+<tr><td>P1035</td><td>D35</td><td>EURUSD</td><td>2025-07-01 08:05:00</td><td>Buy</td><td>1.00</td><td>1.08000</td><td>1.07600</td><td>-40.00</td><td>-3.00</td><td>-0.30</td><td>-43.30</td><td>10857.10</td></tr>
+<tr><td>P1036</td><td>D36</td><td>XAUUSD</td><td>2025-07-08 11:50:00</td><td>Buy</td><td>0.10</td><td>2400.0</td><td>2420.0</td><td>200.00</td><td>-2.50</td><td>-0.70</td><td>196.80</td><td>11053.90</td></tr>
+<tr><td>P1037</td><td>D37</td><td>GBPUSD</td><td>2025-07-14 13:25:00</td><td>Buy</td><td>1.00</td><td>1.28000</td><td>1.28500</td><td>50.00</td><td>-3.00</td><td>-0.30</td><td>46.70</td><td>11100.60</td></tr>
+<tr><td>P1038</td><td>D38</td><td>EURUSD</td><td>2025-07-22 09:30:00</td><td>Sell</td><td>1.00</td><td>1.09000</td><td>1.08700</td><td>30.00</td><td>-3.00</td><td>-0.20</td><td>26.80</td><td>11127.40</td></tr>
+<tr><td>P1039</td><td>D39</td><td>USDJPY</td><td>2025-07-29 08:15:00</td><td>Buy</td><td>1.00</td><td>162.00</td><td>162.50</td><td>50.00</td><td>-3.00</td><td>-0.20</td><td>46.80</td><td>11174.20</td></tr>
+<tr><td>P1040</td><td>D40</td><td>EURUSD</td><td>2025-08-04 14:30:00</td><td>Buy</td><td>1.00</td><td>1.08800</td><td>1.09200</td><td>40.00</td><td>-3.00</td><td>-0.40</td><td>36.60</td><td>11210.80</td></tr>
+<tr><td>P1041</td><td>D41</td><td>XAUUSD</td><td>2025-08-11 09:00:00</td><td>Buy</td><td>0.10</td><td>2450.0</td><td>2470.0</td><td>200.00</td><td>-2.50</td><td>-0.50</td><td>197.00</td><td>11407.80</td></tr>
+<tr><td>P1042</td><td>D42</td><td>GBPUSD</td><td>2025-08-18 10:35:00</td><td>Sell</td><td>1.00</td><td>1.29000</td><td>1.28700</td><td>30.00</td><td>-3.00</td><td>-0.20</td><td>26.80</td><td>11434.60</td></tr>
+<tr><td>P1043</td><td>D43</td><td>EURUSD</td><td>2025-08-25 15:20:00</td><td>Buy</td><td>1.00</td><td>1.08600</td><td>1.08900</td><td>30.00</td><td>-3.00</td><td>-0.30</td><td>26.70</td><td>11461.30</td></tr>
+<tr><td>P1044</td><td>D44</td><td>USDJPY</td><td>2025-09-01 11:40:00</td><td>Sell</td><td>1.00</td><td>165.00</td><td>164.30</td><td>70.00</td><td>-3.00</td><td>-0.20</td><td>66.80</td><td>11528.10</td></tr>
+<tr><td>P1045</td><td>D45</td><td>EURUSD</td><td>2025-09-05 08:30:00</td><td>Buy</td><td>1.00</td><td>1.09000</td><td>1.08700</td><td>-30.00</td><td>-3.00</td><td>-0.20</td><td>-33.20</td><td>11494.90</td></tr>
+<tr><td>P1046</td><td>D46</td><td>XAUUSD</td><td>2025-09-12 13:00:00</td><td>Sell</td><td>0.10</td><td>2500.0</td><td>2485.0</td><td>150.00</td><td>-2.50</td><td>0.00</td><td>147.50</td><td>11642.40</td></tr>
+<tr><td>P1047</td><td>D47</td><td>GBPUSD</td><td>2025-09-18 10:05:00</td><td>Buy</td><td>1.00</td><td>1.28500</td><td>1.29000</td><td>50.00</td><td>-3.00</td><td>-0.30</td><td>46.70</td><td>11689.10</td></tr>
+<tr><td>P1048</td><td>D48</td><td>EURUSD</td><td>2025-09-24 09:45:00</td><td>Sell</td><td>1.00</td><td>1.08300</td><td>1.08000</td><td>30.00</td><td>-3.00</td><td>-0.20</td><td>36.80</td><td>11715.90</td></tr>
+<tr><td>P1049</td><td>D49</td><td>USDJPY</td><td>2025-09-30 14:10:00</td><td>Buy</td><td>1.00</td><td>168.00</td><td>168.40</td><td>40.00</td><td>-3.00</td><td>-0.20</td><td>36.80</td><td>11752.70</td></tr>
+<tr><td>P1050</td><td>D50</td><td>EURUSD</td><td>2025-10-06 10:20:00</td><td>Buy</td><td>1.00</td><td>1.08400</td><td>1.09000</td><td>60.00</td><td>-3.00</td><td>-0.40</td><td>56.60</td><td>11809.30</td></tr>
+<tr><td>P1051</td><td>D51</td><td>XAUUSD</td><td>2025-10-13 11:10:00</td><td>Buy</td><td>0.10</td><td>2540.0</td><td>2560.0</td><td>200.00</td><td>-2.50</td><td>-0.80</td><td>196.70</td><td>12006.00</td></tr>
+<tr><td>P1052</td><td>D52</td><td>GBPUSD</td><td>2025-10-20 08:40:00</td><td>Sell</td><td>1.00</td><td>1.30000</td><td>1.29700</td><td>30.00</td><td>-3.00</td><td>-0.20</td><td>26.80</td><td>12032.80</td></tr>
+<tr><td>P1053</td><td>D53</td><td>EURUSD</td><td>2025-10-27 15:00:00</td><td>Buy</td><td>1.00</td><td>1.08700</td><td>1.09000</td><td>30.00</td><td>-3.00</td><td>-0.30</td><td>26.70</td><td>12059.50</td></tr>
+<tr><td>P1054</td><td>D54</td><td>USDJPY</td><td>2025-11-03 09:15:00</td><td>Sell</td><td>1.00</td><td>172.00</td><td>171.20</td><td>80.00</td><td>-3.00</td><td>-0.20</td><td>76.80</td><td>12136.30</td></tr>
+<tr><td>P1055</td><td>D55</td><td>EURUSD</td><td>2025-11-07 13:45:00</td><td>Sell</td><td>1.00</td><td>1.09200</td><td>1.08800</td><td>40.00</td><td>-3.00</td><td>-0.20</td><td>36.80</td><td>12173.10</td></tr>
+<tr><td>P1056</td><td>D56</td><td>XAUUSD</td><td>2025-11-14 10:30:00</td><td>Buy</td><td>0.10</td><td>2600.0</td><td>2580.0</td><td>-200.00</td><td>-2.50</td><td>-0.50</td><td>-203.00</td><td>11970.10</td></tr>
+<tr><td>P1057</td><td>D57</td><td>GBPUSD</td><td>2025-11-21 08:35:00</td><td>Buy</td><td>1.00</td><td>1.29500</td><td>1.29900</td><td>40.00</td><td>-3.00</td><td>-0.30</td><td>36.70</td><td>12006.80</td></tr>
+<tr><td>P1058</td><td>D58</td><td>EURUSD</td><td>2025-11-28 15:25:00</td><td>Buy</td><td>1.00</td><td>1.09400</td><td>1.09700</td><td>30.00</td><td>-3.00</td><td>-0.20</td><td>26.80</td><td>12033.60</td></tr>
+<tr><td>P1059</td><td>D59</td><td>USDJPY</td><td>2025-12-04 09:00:00</td><td>Buy</td><td>1.00</td><td>175.00</td><td>175.40</td><td>40.00</td><td>-3.00</td><td>-0.20</td><td>36.80</td><td>12070.40</td></tr>
+<tr><td>P1060</td><td>D60</td><td>EURUSD</td><td>2025-12-10 13:30:00</td><td>Sell</td><td>1.00</td><td>1.08800</td><td>1.08400</td><td>40.00</td><td>-3.00</td><td>-0.20</td><td>36.80</td><td>12107.20</td></tr>
+<tr><td>P1061</td><td>D61</td><td>XAUUSD</td><td>2025-12-16 11:40:00</td><td>Buy</td><td>0.10</td><td>2680.0</td><td>2710.0</td><td>300.00</td><td>-2.50</td><td>-0.70</td><td>296.80</td><td>12404.00</td></tr>
+<tr><td>P1062</td><td>D62</td><td>GBPUSD</td><td>2025-12-22 09:55:00</td><td>Sell</td><td>1.00</td><td>1.31000</td><td>1.30700</td><td>30.00</td><td>-3.00</td><td>-0.20</td><td>26.80</td><td>12430.80</td></tr>
+<tr><td>P1063</td><td>D63</td><td>EURUSD</td><td>2025-12-30 15:40:00</td><td>Buy</td><td>1.00</td><td>1.09500</td><td>1.10000</td><td>50.00</td><td>-3.00</td><td>-0.30</td><td>46.70</td><td>12477.50</td></tr>
+</tbody>
+</table>
+</body>
+</html>

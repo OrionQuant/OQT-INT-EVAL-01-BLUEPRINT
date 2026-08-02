@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Vendored local deps (install via `pip install -r requirements.txt` instead)
+_deps/
+
+# Test / type-checker caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# Runtime / user data
+evaluations/*.json
+evaluations/*.csv
+!evaluations/.gitkeep
+
+# Dumps / logs
+*.log
+*.dump
+.DS_Store
+Thumbs.db

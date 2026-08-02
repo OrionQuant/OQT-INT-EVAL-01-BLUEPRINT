@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>OrionQuant — Strategy Evaluation Tool</title>
+<link rel="stylesheet" href="/static/styles.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>OrionQuant · Strategy Evaluation</h1>
+  <nav>
+    <button id="nav-evaluate" class="active">Evaluate</button>
+    <button id="nav-compare">Saved / Compare</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ================ EVALUATE VIEW ================ -->
+  <section id="view-evaluate" class="view active">
+    <div class="card upload-card">
+      <h2>Upload Report</h2>
+      <form id="upload-form">
+        <div class="row">
+          <label>File (.html / .csv / .xlsx)
+            <input type="file" id="file-input" accept=".html,.htm,.csv,.xlsx" required/>
+          </label>
+        </div>
+        <div class="row grid-3">
+          <label>Strategy name
+            <input type="text" id="strategy-name" placeholder="My Strategy"/>
+          </label>
+          <label>Seed (blank = random)
+            <input type="number" id="seed-input" placeholder="e.g. 42"/>
+          </label>
+          <label>Start balance
+            <input type="number" id="balance-input" value="10000" step="100"/>
+          </label>
+        </div>
+        <button type="submit" id="run-btn" class="primary">Evaluate →</button>
+      </form>
+      <div id="upload-status" class="status"></div>
+    </div>
+
+    <div id="results-area" style="display:none;">
+      <div class="card score-card" id="score-card">
+        <div class="score-top">
+          <div class="score-number-wrap">
+            <div id="final-score" class="score-number">—</div>
+            <div id="score-label" class="score-label">Upload a report</div>
+            <div id="knockout-pill" class="pill ko" style="display:none;">KNOCKED_OUT</div>
+            <div id="correlation-pill" class="pill warn" style="display:none;">⚠ Correlation flag — using Block Bootstrap</div>
+          </div>
+          <div class="score-meta">
+            <div>N trades: <span id="n-trades">—</span></div>
+            <div>Seed: <span id="seed-used">—</span></div>
+            <div>Format: <span id="fmt-used">—</span></div>
+            <button id="save-btn" class="primary small" style="display:none;">💾 Save this run</button>
+          </div>
+        </div>
+        <div id="knockout-reason" class="ko-reason" style="display:none;"></div>
+        <div class="cat-scores" id="cat-scores"><!-- bars inserted by JS --></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card"><h3>Equity Curve</h3><canvas id="equity-chart"></canvas></div>
+        <div class="card"><h3>Drawdown Profile</h3><canvas id="drawdown-chart"></canvas></div>
+        <div class="card"><h3>Trade PnL Distribution</h3><canvas id="pnl-dist-chart"></canvas></div>
+        <div class="card"><h3>Monte Carlo — Test A Distributions</h3><canvas id="mc-dist-chart"></canvas></div>
+        <div class="card"><h3>Score Breakdown</h3><canvas id="score-chart"></canvas></div>
+        <div class="card"><h3>Monthly Returns Heatmap</h3><div id="monthly-heat" class="heatmap"></div></div>
+      </div>
+
+      <div class="card">
+        <h3>All Metrics</h3>
+        <table id="metrics-table" class="metrics-table"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================ SAVED / COMPARE VIEW ================ -->
+  <section id="view-compare" class="view">
+    <div class="card">
+      <h2>Saved Evaluations</h2>
+      <div id="saved-list" class="saved-list"><p class="muted">No saved evaluations yet. Run an evaluation and click "Save".</p></div>
+      <div style="margin-top:1rem;">
+        <button id="compare-btn" class="primary" disabled>Compare selected (baseline = first)</button>
+      </div>
+    </div>
+
+    <div id="compare-area" style="display:none;">
+      <div class="card">
+        <h3>Overlayed Equity Curves</h3>
+        <canvas id="compare-equity-chart"></canvas>
+      </div>
+      <div class="card">
+        <h3>Radar: Category Scores</h3>
+        <canvas id="compare-radar-chart"></canvas>
+      </div>
+      <div class="card">
+        <h3>Metrics vs Baseline</h3>
+        <table id="compare-table" class="metrics-table"></table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
