@@ -59,7 +59,7 @@ class TestMiniKnownValues:
     def setup_method(self):
         self.trades = _mini_trades()
         self.metrics, self.equity, self.monthly = compute_all_metrics(
-            self.trades, start_balance=10000.0, rf_annual=0.04,
+            self.trades, start_balance=10000.0, rf_annual=0.04, n_trials=1,
         )
 
     # §4.1 Basic
@@ -141,7 +141,7 @@ class TestSampleCsvMetrics:
         raw = (FIXTURES / "sample_trades.csv").read_bytes()
         rows, _, _, _ = ingest_file(raw, "sample_trades.csv")
         trades, report = clean_raw_rows(rows, evaluations_dir=str(tmp))
-        m, eq, mo = compute_all_metrics(trades, start_balance=10000.0)
+        m, eq, mo = compute_all_metrics(trades, start_balance=10000.0, n_trials=1)
         return m, eq, mo, report, trades
 
     def test_sample_size(self, sample_result):

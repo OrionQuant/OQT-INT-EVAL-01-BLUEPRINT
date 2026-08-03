@@ -191,6 +191,50 @@ class MonteCarloResult(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+# Module 4: Moving-block bootstrap (fixed L, overlapping blocks)
+# --------------------------------------------------------------------------- #
+
+class MovingBlockResult(BaseModel):
+    """Fixed-length moving-block bootstrap on the closed-trade PnL series."""
+
+    iterations: int
+    block_length: int
+    percentiles: MCPercentiles
+    robustness_rate: Optional[float] = None       # P(TR > 0) under blocks
+    sharpe_stability: Optional[float] = None      # P(SR > 1.0)
+    mean_sharpe: Optional[float] = None
+    # Comparison vs i.i.d. bootstrap (MC Test A) when provided
+    iid_robustness_rate: Optional[float] = None
+    iid_sharpe_stability: Optional[float] = None
+    # iid_rr − block_rr (>0 ⇒ serial dependence worsens robustness)
+    block_vs_iid_rr_gap: Optional[float] = None
+
+
+# --------------------------------------------------------------------------- #
+# Report-analysis layer summary (Modules 3 + 4 + 5)
+# --------------------------------------------------------------------------- #
+
+class OverfittingEstimate(BaseModel):
+    """Bounded overfitting risk from static trade-history analysis only.
+
+    Walk-forward and purged CV are explicitly out of scope for this tool.
+    """
+
+    disclaimer: str = DISCLAIMER_TEXT
+    n_obs: int                                  # PSR sample size = trade count
+    dsr_n_trials: int                           # user-supplied trial count
+    probabilistic_sharpe_ratio: Optional[float] = None
+    deflated_sharpe_ratio: Optional[float] = None
+    regime_unstable: bool = False
+    moving_block_robustness_rate: Optional[float] = None
+    iid_robustness_rate: Optional[float] = None
+    block_dependence_gap: Optional[float] = None
+    # True when DSR is weak, regime is unstable, or block RR << iid RR
+    bounded_overfit_flag: bool = False
+    summary: str = ""
+
+
+# --------------------------------------------------------------------------- #
 # Scoring
 # --------------------------------------------------------------------------- #
 
@@ -255,10 +299,14 @@ class Scorecard(BaseModel):
     cleaning_report: CleaningReport
     metrics: Metrics
     monte_carlo: MonteCarloResult
+    # Module 4 — dedicated moving-block bootstrap (alongside MC Test C)
+    moving_block: Optional[MovingBlockResult] = None
+    # Modules 3+4+5 rolled into a single bounded-overfit view
+    overfitting: Optional[OverfittingEstimate] = None
     correlation_flag: bool = False
     scoring: ScoringResult
     equity_curve: List[EquityPoint]
     monthly_returns: Dict[str, float] = Field(default_factory=dict)
     # Report-analysis layer — explicit disclaimer for every dashboard/report.
     disclaimer: str = DISCLAIMER_TEXT
-    version: str = "1.1"
+    version: str = "1.2"

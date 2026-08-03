@@ -11,6 +11,8 @@ __all__ = [
     "cleaning",
     "metrics",
     "monte_carlo",
+    "regime",
+    "block_bootstrap",
     "scoring",
     "storage",
 ]

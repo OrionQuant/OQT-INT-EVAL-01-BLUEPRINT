@@ -255,7 +255,7 @@ class TestCappedPnlScoringPath:
         assert outlier.capped_pnl is not None
         assert outlier.capped_pnl < outlier.pnl
 
-        metrics, _, _ = compute_all_metrics(trades, start_balance=10_000.0)
+        metrics, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=1)
         # Net PnL on the scoring path must reflect the cap (not the raw 50k spike)
         assert metrics.growth.net_pnl < 50_000.0
 
@@ -292,7 +292,7 @@ class TestSeedStringRoundTrip:
         raw = (FIXTURES / "sample_trades.csv").read_bytes()
         rows, _, _, _ = ingest_file(raw, "s.csv")
         trades, _ = clean_raw_rows(rows, evaluations_dir=str(tmp_path))
-        metrics, _, _ = compute_all_metrics(trades, start_balance=10_000.0)
+        metrics, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=1)
 
         # Large seed that would lose precision as a JS Number (> 2^53)
         big = "9007199254740993"  # 2^53 + 1
@@ -330,18 +330,31 @@ class TestSeedStringRoundTrip:
 
 
 class TestDsrPsrParameterRules:
-    def test_psr_uses_n_obs_dsr_needs_n_trials(self, tmp_path):
+    def test_psr_uses_n_obs_dsr_uses_n_trials(self, tmp_path):
         raw = (FIXTURES / "sample_trades.csv").read_bytes()
         rows, _, _, _ = ingest_file(raw, "s.csv")
         trades, _ = clean_raw_rows(rows, evaluations_dir=str(tmp_path))
 
-        m_no, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=None)
-        assert m_no.risk_adj.probabilistic_sharpe_ratio is not None
-        assert m_no.risk_adj.deflated_sharpe_ratio is None
-        assert m_no.risk_adj.dsr_n_trials is None
+        m1, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=1)
+        m50, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=50)
+        assert m1.risk_adj.probabilistic_sharpe_ratio is not None
+        assert m50.risk_adj.probabilistic_sharpe_ratio is not None
+        # Same N_obs → same PSR
+        assert m1.risk_adj.probabilistic_sharpe_ratio == pytest.approx(
+            m50.risk_adj.probabilistic_sharpe_ratio, abs=1e-12
+        )
+        assert m50.risk_adj.dsr_n_trials == 50
+        assert m50.risk_adj.deflated_sharpe_ratio is not None
+        # Higher N_trials raises the DSR reference bar → DSR ≤ PSR
+        assert m50.risk_adj.deflated_sharpe_ratio <= m50.risk_adj.probabilistic_sharpe_ratio + 1e-12
+        # More trials → DSR no higher than with N_trials=1
+        assert m50.risk_adj.deflated_sharpe_ratio <= m1.risk_adj.deflated_sharpe_ratio + 1e-12
 
-        m_yes, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=50)
-        assert m_yes.risk_adj.dsr_n_trials == 50
-        assert m_yes.risk_adj.deflated_sharpe_ratio is not None
-        # DSR must be <= PSR for the same observed SR (higher reference bar)
-        assert m_yes.risk_adj.deflated_sharpe_ratio <= m_yes.risk_adj.probabilistic_sharpe_ratio + 1e-12
+    def test_n_trials_required(self, tmp_path):
+        raw = (FIXTURES / "sample_trades.csv").read_bytes()
+        rows, _, _, _ = ingest_file(raw, "s.csv")
+        trades, _ = clean_raw_rows(rows, evaluations_dir=str(tmp_path))
+        with pytest.raises(TypeError):
+            compute_all_metrics(trades, start_balance=10_000.0)  # noqa: missing n_trials
+        with pytest.raises(ValueError):
+            compute_all_metrics(trades, start_balance=10_000.0, n_trials=0)

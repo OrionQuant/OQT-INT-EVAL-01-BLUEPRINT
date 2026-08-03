@@ -39,8 +39,11 @@
           </label>
         </div>
         <div class="row grid-3">
-          <label>N_trials (DSR; blank = skip)
-            <input type="number" id="n-trials-input" placeholder="e.g. 50" min="1" step="1"/>
+          <label>N_trials (required for DSR)
+            <input type="number" id="n-trials-input" placeholder="e.g. 50" min="1" step="1" required value="1"/>
+          </label>
+          <label class="muted" style="justify-content:flex-end;">
+            N_trials = backtests / variants tried — not the trade count (that is N_obs for PSR).
           </label>
         </div>
         <button type="submit" id="run-btn" class="primary">Evaluate →</button>
@@ -76,6 +79,12 @@
         <div class="card"><h3>Monte Carlo — Test A Distributions</h3><canvas id="mc-dist-chart"></canvas></div>
         <div class="card"><h3>Score Breakdown</h3><canvas id="score-chart"></canvas></div>
         <div class="card"><h3>Monthly Returns Heatmap</h3><div id="monthly-heat" class="heatmap"></div></div>
+      </div>
+
+      <div class="card" id="overfit-card">
+        <h3>Bounded Overfitting Estimate (Modules 3 · 4 · 5)</h3>
+        <div id="overfit-summary" class="muted" style="margin-bottom:.75rem;"></div>
+        <table id="overfit-table" class="metrics-table"></table>
       </div>
 
       <div class="card">

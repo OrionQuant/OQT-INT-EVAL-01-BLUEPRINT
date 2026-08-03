@@ -25,8 +25,14 @@
     const fd = new FormData();
     fd.append("file", file);
     const cfg = { start_balance: Number($("#balance-input").value) || 10000 };
-    const nTrials = $("#n-trials-input") && $("#n-trials-input").value;
-    if (nTrials) cfg.n_trials = Number(nTrials);
+    const nTrialsRaw = $("#n-trials-input") && $("#n-trials-input").value;
+    const nTrials = Number(nTrialsRaw);
+    if (!nTrialsRaw || !Number.isFinite(nTrials) || nTrials < 1) {
+      status.textContent = "Error: N_trials is required (≥ 1). Enter how many strategy variants / backtests were tried.";
+      status.className = "status error";
+      return;
+    }
+    cfg.n_trials = Math.floor(nTrials);
     fd.append("config", JSON.stringify(cfg));
     const seed = $("#seed-input").value;
     if (seed) fd.append("seed", String(seed));
@@ -107,6 +113,50 @@
     renderScoreBreakdown(s.category_scores);
     renderMonthlyHeat(card.monthly_returns);
     renderMetricsTable(card);
+    renderOverfitting(card);
+  }
+
+  function renderOverfitting(card) {
+    const host = $("#overfit-summary");
+    const tbl = $("#overfit-table");
+    if (!host || !tbl) return;
+    const o = card.overfitting;
+    if (!o) {
+      host.textContent = "—";
+      tbl.innerHTML = "";
+      return;
+    }
+    host.textContent = o.summary || "";
+    const pill = o.bounded_overfit_flag
+      ? `<span class="pill warn">bounded overfit flag ON</span>`
+      : `<span class="pill" style="background:rgba(50,213,131,.2);color:var(--good);">flag clear</span>`;
+    host.innerHTML = `${pill} <span style="margin-left:.5rem;">${o.summary || ""}</span>`;
+
+    const rows = [
+      ["N_obs (PSR sample size)", o.n_obs],
+      ["N_trials (DSR deflation)", o.dsr_n_trials],
+      ["Probabilistic Sharpe (PSR)", o.probabilistic_sharpe_ratio != null ? o.probabilistic_sharpe_ratio.toFixed(4) : "—"],
+      ["Deflated Sharpe (DSR)", o.deflated_sharpe_ratio != null ? o.deflated_sharpe_ratio.toFixed(4) : "—"],
+      ["Regime unstable (CUSUM)", o.regime_unstable ? "yes" : "no"],
+      ["Moving-block RR", o.moving_block_robustness_rate != null ? (o.moving_block_robustness_rate * 100).toFixed(1) + "%" : "—"],
+      ["i.i.d. RR (Test A)", o.iid_robustness_rate != null ? (o.iid_robustness_rate * 100).toFixed(1) + "%" : "—"],
+      ["Block − iid RR gap", o.block_dependence_gap != null ? o.block_dependence_gap.toFixed(3) : "—"],
+    ];
+    if (card.moving_block) {
+      rows.push(["Moving-block L", card.moving_block.block_length]);
+      rows.push(["Moving-block Sharpe stability",
+        card.moving_block.sharpe_stability != null
+          ? (card.moving_block.sharpe_stability * 100).toFixed(1) + "%" : "—"]);
+    }
+    const rc = card.metrics && card.metrics.behav && card.metrics.behav.regime_check;
+    if (rc && rc.cusum_full) {
+      rows.push(["CUSUM threshold hits", rc.cusum_full.n_regime_shifts_detected]);
+      rows.push(["Mean return half-gap", rc.mean_return_gap != null ? rc.mean_return_gap.toFixed(6) : "—"]);
+      rows.push(["Sharpe half-gap", rc.sharpe_half_gap != null ? rc.sharpe_half_gap.toFixed(3) : "—"]);
+    }
+    tbl.innerHTML = `<thead><tr><th>Signal</th><th>Value</th></tr></thead><tbody>` +
+      rows.map(([n, v]) => `<tr><td>${n}</td><td style="text-align:right;font-variant-numeric:tabular-nums;">${v}</td></tr>`).join("") +
+      `</tbody>`;
   }
 
   function renderCategoryScores(cats) {
@@ -296,6 +346,9 @@
     push("Ulcer Index", drawdown.ulcer_index, v => (v * 100).toFixed(2) + "%");
     push("Recovery Factor", drawdown.recovery_factor, v => v.toFixed(2));
     push("Sharpe Ratio", risk_adj.sharpe_ratio, v => v.toFixed(3));
+    push("Probabilistic Sharpe (PSR)", risk_adj.probabilistic_sharpe_ratio, v => v.toFixed(4));
+    push("Deflated Sharpe (DSR)", risk_adj.deflated_sharpe_ratio, v => v.toFixed(4));
+    push("DSR N_trials", risk_adj.dsr_n_trials);
     push("Sortino Ratio", risk_adj.sortino_ratio, v => v.toFixed(3));
     push("Calmar Ratio", risk_adj.calmar_ratio, v => v.toFixed(3));
     push("Omega Ratio", risk_adj.omega_ratio, v => v.toFixed(3));

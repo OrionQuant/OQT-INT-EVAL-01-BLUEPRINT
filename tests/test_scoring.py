@@ -249,7 +249,7 @@ class TestSampleE2EScoring:
         raw = (FIXTURES / "sample_trades.csv").read_bytes()
         rows, _, _, _ = ingest_file(raw, "s.csv")
         trades, report = clean_raw_rows(rows, evaluations_dir=str(tmp_path))
-        metrics, _, _ = compute_all_metrics(trades, start_balance=10000.0)
+        metrics, _, _ = compute_all_metrics(trades, start_balance=10000.0, n_trials=1)
         rng1, seed1 = make_rng(42)
         rng2, seed2 = make_rng(42)
         mc1 = run_monte_carlo(trades, rng1, start_balance=10000.0, iterations=200,

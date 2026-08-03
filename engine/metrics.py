@@ -22,6 +22,7 @@ from .models import (
     RiskAdjustedMetrics,
     Trade,
 )
+from .regime import run_regime_check
 
 EPS = 1e-9
 
@@ -446,7 +447,7 @@ def _compute_risk_adj(
     cagr: float | None,
     rf_annual: float = 0.04,
     *,
-    n_trials: int | None = None,
+    n_trials: int,
     skew_returns: float = 0.0,
     excess_kurtosis_returns: float = 0.0,
 ) -> RiskAdjustedMetrics:
@@ -512,7 +513,7 @@ def _compute_risk_adj(
     tail = R[R <= p5]
     cvar_95 = -float(np.mean(tail)) if tail.size > 0 else 0.0
 
-    # --- Module 5: PSR (N_obs = trade count) / DSR (N_trials = user input) ---
+    # --- Module 5: PSR (N_obs = trade count) / DSR (N_trials = required user input) ---
     # kurtosis in the PSR formula is the non-excess (Pearson) kurtosis
     pearson_kurt = float(excess_kurtosis_returns) + 3.0
     psr = _probabilistic_sharpe_ratio(
@@ -521,16 +522,14 @@ def _compute_risk_adj(
         skew=float(skew_returns),
         kurt=pearson_kurt,
     )
-    dsr: float | None = None
-    sr_ref_dsr = 0.0
-    if n_trials is not None and int(n_trials) >= 1:
-        sr_ref_dsr = _expected_max_sharpe(int(n_trials))
-        dsr = _probabilistic_sharpe_ratio(
-            float(sr_raw), n,
-            sr_ref=sr_ref_dsr,
-            skew=float(skew_returns),
-            kurt=pearson_kurt,
-        )
+    n_tr = max(1, int(n_trials))
+    sr_ref_dsr = _expected_max_sharpe(n_tr)
+    dsr = _probabilistic_sharpe_ratio(
+        float(sr_raw), n,
+        sr_ref=sr_ref_dsr,
+        skew=float(skew_returns),
+        kurt=pearson_kurt,
+    )
 
     return RiskAdjustedMetrics(
         sharpe_ratio=float(sr_raw),
@@ -546,8 +545,8 @@ def _compute_risk_adj(
         avg_trades_per_year=float(atpy),
         probabilistic_sharpe_ratio=psr,
         deflated_sharpe_ratio=dsr,
-        psr_reference_sharpe=float(sr_ref_dsr) if n_trials is not None else 0.0,
-        dsr_n_trials=int(n_trials) if n_trials is not None else None,
+        psr_reference_sharpe=float(sr_ref_dsr),
+        dsr_n_trials=n_tr,
     )
 
 
@@ -633,18 +632,22 @@ def compute_all_metrics(
     *,
     start_balance: float = 10_000.0,
     rf_annual: float = 0.04,
-    n_trials: int | None = None,
+    n_trials: int,
 ) -> Tuple[Metrics, List[EquityPoint], Dict[str, float]]:
     """Compute every metric group plus equity curve and monthly returns.
 
-    ``n_trials`` is the DSR deflation parameter (user-provided count of
-    backtests / parameter variants). It is *never* inferred from trade count;
-    ``N_obs`` for PSR is always ``len(trades)``.
+    ``n_trials`` (required) is the DSR deflation parameter — the count of
+    backtests / parameter variants tried. It is *never* inferred from trade
+    count; ``N_obs`` for PSR is always ``len(trades)``.
+
+    Also attaches Module 3 (CUSUM / regime) onto ``metrics.behav.regime_check``.
 
     Returns ``(metrics, equity_curve, monthly_returns)``.
     """
     if not trades:
         raise ValueError("No trades provided — cannot compute metrics.")
+    if int(n_trials) < 1:
+        raise ValueError("n_trials must be >= 1 (required user input for DSR).")
 
     arr = _trade_arrays(trades, use_capped=True)
     balance_before = _build_balance_series(arr, start_balance)
@@ -659,7 +662,7 @@ def compute_all_metrics(
     ra = _compute_risk_adj(
         arr, R, dd.max_drawdown, growth.total_return, growth.cagr,
         rf_annual=rf_annual,
-        n_trials=n_trials,
+        n_trials=int(n_trials),
         skew_returns=growth.skew_returns,
         excess_kurtosis_returns=growth.excess_kurtosis_returns,
     )
@@ -668,6 +671,8 @@ def compute_all_metrics(
     monthly = _monthly_returns(equity)
 
     behav = _compute_behavioural(arr, monthly)
+    # Module 3 — CUSUM / regime on realised per-trade returns
+    behav.regime_check = run_regime_check(R)
 
     metrics = Metrics(basic=basic, growth=growth, drawdown=dd, risk_adj=ra, behav=behav)
     return metrics, equity, monthly

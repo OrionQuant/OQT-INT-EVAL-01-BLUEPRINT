@@ -29,7 +29,7 @@ def _run_sample_with_seed(seed: int, tmp, iterations: int = 100):
     raw = (FIXTURES / "sample_trades.csv").read_bytes()
     rows, _, _, _ = ingest_file(raw, "s.csv")
     trades, _ = clean_raw_rows(rows, evaluations_dir=str(tmp))
-    metrics, _, _ = compute_all_metrics(trades, start_balance=10000.0)
+    metrics, _, _ = compute_all_metrics(trades, start_balance=10000.0, n_trials=1)
     rng, _ = make_rng(seed)
     mc = run_monte_carlo(
         trades, rng, start_balance=10000.0, iterations=iterations,
