@@ -9,6 +9,9 @@ Three complementary tests, all driven by a single seeded
 
 Plus ``correlation_flag`` which triggers when Test C's 5th-percentile MDD
 is more than 1.5× worse than Test A's — indicating broken i.i.d.
+
+Sharpe inside each synthetic path matches ``metrics._compute_risk_adj``:
+annualised, risk-free adjusted (Fix #6).
 """
 
 from __future__ import annotations
@@ -34,10 +37,18 @@ DEFAULT_ITERATIONS = 1000
 # --------------------------------------------------------------------------- #
 
 
-def _run_metrics(pnl: np.ndarray, start_balance: float) -> Tuple[float, float, float, float]:
-    """Return (TR, MDD, Sharpe-like, Profit Factor) for one synthetic series.
+def _run_metrics(
+    pnl: np.ndarray,
+    start_balance: float,
+    *,
+    atpy: float,
+    rf_annual: float = 0.04,
+) -> Tuple[float, float, float, float]:
+    """Return (TR, MDD, Sharpe, Profit Factor) for one synthetic series.
 
-    Computed as scalars; no heavy-weight Metrics object needed.
+    Sharpe matches ``metrics._compute_risk_adj``: excess return over
+    ``rf_per_trade``, annualised by ``K = sqrt(atpy)`` when N ≥ 10, with the
+    same small-sample correction when N < 30.
     """
     n = pnl.size
     if n == 0:
@@ -53,14 +64,24 @@ def _run_metrics(pnl: np.ndarray, start_balance: float) -> Tuple[float, float, f
     dd = (equity - peak) / np.where(peak > 0, peak, 1.0)
     mdd = float(np.min(dd))
 
-    # Simple per-trade returns vs start balance
     bal_before = equity[:-1]
     bal_before_safe = np.where(np.abs(bal_before) > EPS, bal_before, 1.0)
     R = pnl / bal_before_safe
-    mu = float(np.mean(R))
-    sigma = float(np.std(R, ddof=1)) if n >= 2 else 0.0
-    # Annualisation factor: skip if very few trades — match metrics.py behaviour
-    sr = (mu / sigma) if sigma > EPS else 0.0
+
+    annualised = n >= 10
+    if annualised and atpy > EPS:
+        rf_per_trade = (1.0 + rf_annual) ** (1.0 / atpy) - 1.0
+        K = float(np.sqrt(atpy))
+    else:
+        rf_per_trade = 0.0
+        K = 1.0
+
+    excess = R - rf_per_trade
+    mu = float(np.mean(excess)) if excess.size > 0 else 0.0
+    sigma = float(np.std(excess, ddof=1)) if excess.size >= 2 else 0.0
+    sr = (mu * K) / sigma if sigma > EPS else 0.0
+    if n < 30:
+        sr = sr * (n / 30.0) ** 0.5
 
     wins = pnl[pnl > 0]
     losses = pnl[pnl < 0]
@@ -121,6 +142,9 @@ def _test_a(
     start_balance: float,
     rng: np.random.Generator,
     iterations: int,
+    *,
+    atpy: float,
+    rf_annual: float,
 ) -> MCTestResult:
     n = pnl.size
     tr = np.empty(iterations, dtype=float)
@@ -130,7 +154,9 @@ def _test_a(
     for i in range(iterations):
         idx = rng.integers(0, n, size=n)
         sampled = pnl[idx]
-        tr[i], mdd[i], sr[i], pf[i] = _run_metrics(sampled, start_balance)
+        tr[i], mdd[i], sr[i], pf[i] = _run_metrics(
+            sampled, start_balance, atpy=atpy, rf_annual=rf_annual,
+        )
     return _dist_summary(iterations, tr, mdd, sr, pf, include_rr=True)
 
 
@@ -145,6 +171,9 @@ def _test_b(
     actual_mdd: float,
     rng: np.random.Generator,
     iterations: int,
+    *,
+    atpy: float,
+    rf_annual: float,
 ) -> MCTestResult:
     n = pnl.size
     tr = np.empty(iterations, dtype=float)
@@ -154,7 +183,9 @@ def _test_b(
     for i in range(iterations):
         perm = rng.permutation(n)
         permuted = pnl[perm]
-        tr[i], mdd[i], sr[i], pf[i] = _run_metrics(permuted, start_balance)
+        tr[i], mdd[i], sr[i], pf[i] = _run_metrics(
+            permuted, start_balance, atpy=atpy, rf_annual=rf_annual,
+        )
     return _dist_summary(iterations, tr, mdd, sr, pf, include_rr=True, actual_mdd=actual_mdd)
 
 
@@ -190,6 +221,9 @@ def _test_c(
     start_balance: float,
     rng: np.random.Generator,
     iterations: int,
+    *,
+    atpy: float,
+    rf_annual: float,
 ) -> MCTestResult:
     n = pnl.size
     L = float(np.sqrt(n)) if n >= 2 else 1.0
@@ -200,7 +234,9 @@ def _test_c(
     for i in range(iterations):
         idx = _stationary_block_sample(n, L, rng)
         sampled = pnl[idx]
-        tr[i], mdd[i], sr[i], pf[i] = _run_metrics(sampled, start_balance)
+        tr[i], mdd[i], sr[i], pf[i] = _run_metrics(
+            sampled, start_balance, atpy=atpy, rf_annual=rf_annual,
+        )
     return _dist_summary(iterations, tr, mdd, sr, pf, include_rr=True)
 
 
@@ -216,17 +252,39 @@ def run_monte_carlo(
     start_balance: float = 10_000.0,
     iterations: int = DEFAULT_ITERATIONS,
     actual_max_drawdown: float,
+    avg_trades_per_year: float | None = None,
+    rf_annual: float = 0.04,
 ) -> MonteCarloResult:
     """Run all three MC tests, compute correlation_flag, and return aggregate.
 
     ``effective_mc_source`` is "test_c" if the correlation flag is raised;
     otherwise "test_a" — used downstream by scoring.py §6 category 4.
-    """
-    pnl = np.array([t.pnl for t in trades], dtype=float)
 
-    ta = _test_a(pnl, start_balance, rng, iterations)
-    tb = _test_b(pnl, start_balance, actual_max_drawdown, rng, iterations)
-    tc = _test_c(pnl, start_balance, rng, iterations)
+    Uses ``Trade.capped_pnl`` when present so outlier soft-caps flow into MC
+    (Fix #8).
+    """
+    pnl = np.array(
+        [t.capped_pnl if t.capped_pnl is not None else t.pnl for t in trades],
+        dtype=float,
+    )
+    n = pnl.size
+
+    if avg_trades_per_year is not None and avg_trades_per_year > EPS:
+        atpy = float(avg_trades_per_year)
+    elif n >= 2:
+        # Fallback: infer from trade timestamps when caller omitted atpy
+        ts = [t.timestamp for t in trades]
+        days = max(1.0, (ts[-1] - ts[0]).total_seconds() / 86400.0)
+        atpy = n * 365.25 / days
+    else:
+        atpy = float(n)
+
+    ta = _test_a(pnl, start_balance, rng, iterations, atpy=atpy, rf_annual=rf_annual)
+    tb = _test_b(
+        pnl, start_balance, actual_max_drawdown, rng, iterations,
+        atpy=atpy, rf_annual=rf_annual,
+    )
+    tc = _test_c(pnl, start_balance, rng, iterations, atpy=atpy, rf_annual=rf_annual)
 
     # Correlation flag: Test C's 5th-percentile MDD is more than 1.5× worse
     # (more negative) than Test A's 5th-percentile MDD.

@@ -25,9 +25,11 @@
     const fd = new FormData();
     fd.append("file", file);
     const cfg = { start_balance: Number($("#balance-input").value) || 10000 };
+    const nTrials = $("#n-trials-input") && $("#n-trials-input").value;
+    if (nTrials) cfg.n_trials = Number(nTrials);
     fd.append("config", JSON.stringify(cfg));
     const seed = $("#seed-input").value;
-    if (seed) fd.append("seed", seed);
+    if (seed) fd.append("seed", String(seed));
     const name = $("#strategy-name").value || file.name;
     fd.append("strategy_name", name);
     const status = $("#upload-status");
@@ -74,8 +76,14 @@
     $("#final-score").textContent = s.final_score;
     $("#score-label").textContent = s.label;
     $("#n-trades").textContent = card.metrics.basic.total_trades;
-    $("#seed-used").textContent = card.seed ?? "—";
+    $("#seed-used").textContent = card.seed != null ? String(card.seed) : "—";
     $("#fmt-used").textContent = card.input_file.format;
+
+    const disc = $("#scope-disclaimer");
+    if (disc) {
+      disc.textContent = card.disclaimer ||
+        "Notice: True Walk-Forward Validation and Purged Cross-Validation require strategy engine integration and underlying bar/tick data. The overfitting risk reported here is a bounded estimate derived exclusively from static trade-history analysis.";
+    }
 
     const koPill = $("#knockout-pill");
     const koReason = $("#knockout-reason");

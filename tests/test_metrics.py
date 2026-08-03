@@ -173,8 +173,10 @@ class TestSampleCsvMetrics:
     def test_equity_curve_end_balance_matches(self, sample_result):
         m, eq, mo, report, trades = sample_result
         last_eq_balance = eq[-1].balance
-        # Final equity balance should equal start + sum(pnl)
-        expected = 10000.0 + sum(t.pnl for t in trades)
+        # Equity / scoring path uses soft-capped PnL (Fix #8)
+        expected = 10000.0 + sum(
+            (t.capped_pnl if t.capped_pnl is not None else t.pnl) for t in trades
+        )
         assert last_eq_balance == pytest.approx(expected, rel=1e-6)
 
     def test_monthly_returns_span_correct(self, sample_result):

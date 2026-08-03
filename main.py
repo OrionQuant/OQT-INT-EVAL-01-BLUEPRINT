@@ -66,6 +66,9 @@ class EvaluateConfig(BaseModel):
     start_balance: float = 10_000.0
     rf_annual: float = 0.04
     mc_iterations: int = 1000
+    # DSR deflation parameter — total backtests / parameter variants attempted.
+    # Never inferred from trade count (N_obs). Optional; when omitted DSR is null.
+    n_trials: Optional[int] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -78,7 +81,7 @@ def _run_pipeline(
     filename: str,
     *,
     config: EvaluateConfig,
-    seed: Optional[int],
+    seed: Optional[str],
     strategy_name: str,
 ) -> Scorecard:
     # 1. Ingest
@@ -94,19 +97,30 @@ def _run_pipeline(
         raise HTTPException(status_code=400, detail="No valid trade rows after cleaning.")
 
     # 3. Metrics + equity curve + monthly returns
+    #    N_obs (PSR) = len(trades); N_trials (DSR) = config.n_trials (user).
     metrics, equity, monthly = compute_all_metrics(
         trades,
         start_balance=config.start_balance,
         rf_annual=config.rf_annual,
+        n_trials=config.n_trials,
     )
 
-    # 4. Monte Carlo (seeded RNG)
-    rng, actual_seed = make_rng(seed)
+    # 4. Monte Carlo (seeded RNG — seed always stored as string)
+    seed_int: Optional[int] = None
+    if seed is not None and str(seed).strip() != "":
+        # Accept decimal string or legacy integer form from the form field
+        try:
+            seed_int = int(str(seed).strip(), 10)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="seed must be a decimal integer string")
+    rng, actual_seed = make_rng(seed_int)
     mc = run_monte_carlo(
         trades, rng,
         start_balance=config.start_balance,
         iterations=config.mc_iterations,
         actual_max_drawdown=metrics.drawdown.max_drawdown,
+        avg_trades_per_year=metrics.risk_adj.avg_trades_per_year,
+        rf_annual=config.rf_annual,
     )
 
     # 5. Scoring
@@ -118,7 +132,7 @@ def _run_pipeline(
 
     card = Scorecard(
         name=strategy_name or filename,
-        seed=actual_seed,
+        seed=actual_seed,  # always a string (Fix #10)
         input_file=input_info,
         cleaning_report=cleaning_report,
         metrics=metrics,
@@ -148,7 +162,7 @@ def index():
 async def evaluate(
     file: UploadFile = File(...),
     config: str = Form("{}"),
-    seed: Optional[int] = Form(None),
+    seed: Optional[str] = Form(None),
     strategy_name: str = Form(""),
 ):
     raw = await file.read()
@@ -157,7 +171,10 @@ async def evaluate(
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="config must be valid JSON")
     cfg = EvaluateConfig(**cfg_dict)
-    card = _run_pipeline(raw, file.filename or "upload", config=cfg, seed=seed, strategy_name=strategy_name)
+    card = _run_pipeline(
+        raw, file.filename or "upload",
+        config=cfg, seed=seed, strategy_name=strategy_name,
+    )
     return JSONResponse(card.model_dump(mode="json"))
 
 

@@ -6,6 +6,7 @@ metrics, an equity curve, and monthly returns aggregations.
 
 from __future__ import annotations
 
+import math
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -30,8 +31,12 @@ EPS = 1e-9
 # --------------------------------------------------------------------------- #
 
 
-def _trade_arrays(trades: List[Trade]) -> Dict[str, np.ndarray]:
-    """Convert a Trade list to aligned NumPy arrays for vectorised math."""
+def _trade_arrays(trades: List[Trade], *, use_capped: bool = True) -> Dict[str, np.ndarray]:
+    """Convert a Trade list to aligned NumPy arrays for vectorised math.
+
+    When *use_capped* is True (default), prefer ``Trade.capped_pnl`` so scoring
+    and risk metrics follow the MAD soft-cap series (Fix #8 / blueprint §3.3).
+    """
     n = len(trades)
     pnl = np.zeros(n, dtype=float)
     sides = np.zeros(n, dtype=object)
@@ -44,7 +49,10 @@ def _trade_arrays(trades: List[Trade]) -> Dict[str, np.ndarray]:
     symbols = np.zeros(n, dtype=object)
 
     for i, t in enumerate(trades):
-        pnl[i] = t.pnl
+        if use_capped and t.capped_pnl is not None:
+            pnl[i] = float(t.capped_pnl)
+        else:
+            pnl[i] = float(t.pnl)
         sides[i] = t.side
         qty[i] = t.quantity
         ep[i] = t.entry_price
@@ -183,7 +191,6 @@ def _compute_basic(arr: dict) -> BasicMetrics:
     short_mask = sides == "short"
     lc = int(np.sum(long_mask))
     sc = int(np.sum(short_mask))
-    lwr = (float(np.sum(pnl[long_mask & wins_mask])) / max(1, lc)) / max(EPS, 1.0)
     # Proper per-side win rate
     l_wins = int(np.sum(long_mask & wins_mask))
     s_wins = int(np.sum(short_mask & wins_mask))
@@ -292,8 +299,7 @@ def _kurtosis_fallback(x: np.ndarray) -> float:
 # --------------------------------------------------------------------------- #
 
 
-def _compute_drawdown(arr: dict, balance_before: np.ndarray, pnl: np.ndarray, start_balance: float) -> DrawdownMetrics:
-    # Build equity series B_t with starting point
+def _compute_drawdown(pnl: np.ndarray, timestamps: np.ndarray, start_balance: float) -> DrawdownMetrics:
     equity = np.empty(pnl.size + 1, dtype=float)
     equity[0] = start_balance
     equity[1:] = start_balance + np.cumsum(pnl)
@@ -305,7 +311,6 @@ def _compute_drawdown(arr: dict, balance_before: np.ndarray, pnl: np.ndarray, st
     avg_dd = float(np.mean(dd_neg)) if dd_neg.size > 0 else 0.0
 
     # Drawdown duration: longest contiguous run of DD_t < 0, in calendar days
-    timestamps = arr["timestamps"]
     max_dur_days = 0.0
     if timestamps.size > 0:
         # Align timestamps to dd_arr (dd_arr[0] is start, dd_arr[1:] after trades)
@@ -340,8 +345,97 @@ def _compute_drawdown(arr: dict, balance_before: np.ndarray, pnl: np.ndarray, st
 
 
 # --------------------------------------------------------------------------- #
-# §4.4 Risk-Adjusted Returns
+# §4.4 Risk-Adjusted Returns (+ Module 5: PSR / DSR)
 # --------------------------------------------------------------------------- #
+
+
+def _norm_cdf(x: float) -> float:
+    """Standard normal CDF via math.erf (no SciPy dependency required)."""
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+
+def _probabilistic_sharpe_ratio(
+    sr: float,
+    n_obs: int,
+    *,
+    sr_ref: float = 0.0,
+    skew: float = 0.0,
+    kurt: float = 3.0,
+) -> float | None:
+    """Bailey & López de Prado Probabilistic Sharpe Ratio.
+
+    ``n_obs`` is the track-record length (trade count) — *not* N_trials.
+    Returns P(true SR > sr_ref) ∈ [0, 1], or None if undefined.
+    """
+    if n_obs < 2:
+        return None
+    # Non-normal adjustment of the SR sampling std
+    denom = 1.0 - skew * sr + ((kurt - 1.0) / 4.0) * (sr ** 2)
+    if denom <= EPS:
+        return None
+    se = math.sqrt(denom / max(1, n_obs - 1))
+    if se <= EPS:
+        return 1.0 if sr > sr_ref else (0.5 if sr == sr_ref else 0.0)
+    z = (sr - sr_ref) / se
+    return float(_norm_cdf(z))
+
+
+def _expected_max_sharpe(n_trials: int) -> float:
+    """E[max SR] under N independent null trials (standard-normal approx).
+
+    Used as the DSR reference Sharpe. ``n_trials`` is user-supplied — never
+    inferred from trade count.
+    """
+    N = max(1, int(n_trials))
+    if N == 1:
+        return 0.0
+    # Bailey–López de Prado approximation
+    # E[max Z] ≈ (1-γ) Φ^{-1}(1-1/N) + γ Φ^{-1}(1-1/(N·e))
+    def _inv_norm(p: float) -> float:
+        # Acklam's rational approximation (sufficient for DSR)
+        if p <= 0.0:
+            return -8.0
+        if p >= 1.0:
+            return 8.0
+        a = [
+            -3.969683028665376e+01, 2.209460984245205e+02,
+            -2.759285104469687e+02, 1.383577459007291e+02,
+            -3.066479806614716e+01, 2.506628277459239e+00,
+        ]
+        b = [
+            -5.447609879822406e+01, 1.615858368580409e+02,
+            -1.556989798598866e+02, 6.680131188771972e+01,
+            -1.328068155288572e+01,
+        ]
+        c = [
+            -7.784894002430293e-03, -3.223964580411365e-01,
+            -2.400758277161838e+00, -2.549732539343734e+00,
+            4.374664141464968e+00, 2.938163459698151e+00,
+        ]
+        d = [
+            7.784695709041462e-03, 3.224671290700398e-01,
+            2.445134137142996e+00, 3.754408661907416e+00,
+        ]
+        plow = 0.02425
+        phigh = 1.0 - plow
+        if p < plow:
+            q = math.sqrt(-2.0 * math.log(p))
+            return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / \
+                   ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1.0)
+        if p > phigh:
+            q = math.sqrt(-2.0 * math.log(1.0 - p))
+            return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / \
+                    ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1.0)
+        q = p - 0.5
+        r = q * q
+        return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5]) * q / \
+               (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1.0)
+
+    gamma = 0.5772156649  # Euler–Mascheroni
+    return float(
+        (1.0 - gamma) * _inv_norm(1.0 - 1.0 / N)
+        + gamma * _inv_norm(1.0 - 1.0 / (N * math.e))
+    )
 
 
 def _compute_risk_adj(
@@ -351,6 +445,10 @@ def _compute_risk_adj(
     tr: float,
     cagr: float | None,
     rf_annual: float = 0.04,
+    *,
+    n_trials: int | None = None,
+    skew_returns: float = 0.0,
+    excess_kurtosis_returns: float = 0.0,
 ) -> RiskAdjustedMetrics:
     timestamps = arr["timestamps"]
     pnl = arr["pnl"]
@@ -414,6 +512,26 @@ def _compute_risk_adj(
     tail = R[R <= p5]
     cvar_95 = -float(np.mean(tail)) if tail.size > 0 else 0.0
 
+    # --- Module 5: PSR (N_obs = trade count) / DSR (N_trials = user input) ---
+    # kurtosis in the PSR formula is the non-excess (Pearson) kurtosis
+    pearson_kurt = float(excess_kurtosis_returns) + 3.0
+    psr = _probabilistic_sharpe_ratio(
+        float(sr_raw), n,
+        sr_ref=0.0,
+        skew=float(skew_returns),
+        kurt=pearson_kurt,
+    )
+    dsr: float | None = None
+    sr_ref_dsr = 0.0
+    if n_trials is not None and int(n_trials) >= 1:
+        sr_ref_dsr = _expected_max_sharpe(int(n_trials))
+        dsr = _probabilistic_sharpe_ratio(
+            float(sr_raw), n,
+            sr_ref=sr_ref_dsr,
+            skew=float(skew_returns),
+            kurt=pearson_kurt,
+        )
+
     return RiskAdjustedMetrics(
         sharpe_ratio=float(sr_raw),
         sharpe_small_sample_corrected=small_sample_corr,
@@ -426,6 +544,10 @@ def _compute_risk_adj(
         cvar_95=float(cvar_95),
         annualised=annualised,
         avg_trades_per_year=float(atpy),
+        probabilistic_sharpe_ratio=psr,
+        deflated_sharpe_ratio=dsr,
+        psr_reference_sharpe=float(sr_ref_dsr) if n_trials is not None else 0.0,
+        dsr_n_trials=int(n_trials) if n_trials is not None else None,
     )
 
 
@@ -511,15 +633,20 @@ def compute_all_metrics(
     *,
     start_balance: float = 10_000.0,
     rf_annual: float = 0.04,
+    n_trials: int | None = None,
 ) -> Tuple[Metrics, List[EquityPoint], Dict[str, float]]:
     """Compute every metric group plus equity curve and monthly returns.
+
+    ``n_trials`` is the DSR deflation parameter (user-provided count of
+    backtests / parameter variants). It is *never* inferred from trade count;
+    ``N_obs`` for PSR is always ``len(trades)``.
 
     Returns ``(metrics, equity_curve, monthly_returns)``.
     """
     if not trades:
         raise ValueError("No trades provided — cannot compute metrics.")
 
-    arr = _trade_arrays(trades)
+    arr = _trade_arrays(trades, use_capped=True)
     balance_before = _build_balance_series(arr, start_balance)
     R = _per_trade_returns(arr, balance_before)
 
@@ -528,8 +655,14 @@ def compute_all_metrics(
 
     basic = _compute_basic(arr)
     growth = _compute_growth(arr, R, start_balance, end_balance)
-    dd = _compute_drawdown(arr, balance_before, pnl, start_balance)
-    ra = _compute_risk_adj(arr, R, dd.max_drawdown, growth.total_return, growth.cagr, rf_annual=rf_annual)
+    dd = _compute_drawdown(pnl, arr["timestamps"], start_balance)
+    ra = _compute_risk_adj(
+        arr, R, dd.max_drawdown, growth.total_return, growth.cagr,
+        rf_annual=rf_annual,
+        n_trials=n_trials,
+        skew_returns=growth.skew_returns,
+        excess_kurtosis_returns=growth.excess_kurtosis_returns,
+    )
 
     equity = _equity_curve_from_pnl(arr["timestamps"], pnl, start_balance)
     monthly = _monthly_returns(equity)

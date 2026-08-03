@@ -32,10 +32,15 @@
             <input type="text" id="strategy-name" placeholder="My Strategy"/>
           </label>
           <label>Seed (blank = random)
-            <input type="number" id="seed-input" placeholder="e.g. 42"/>
+            <input type="text" id="seed-input" placeholder="e.g. 42" inputmode="numeric"/>
           </label>
           <label>Start balance
             <input type="number" id="balance-input" value="10000" step="100"/>
+          </label>
+        </div>
+        <div class="row grid-3">
+          <label>N_trials (DSR; blank = skip)
+            <input type="number" id="n-trials-input" placeholder="e.g. 50" min="1" step="1"/>
           </label>
         </div>
         <button type="submit" id="run-btn" class="primary">Evaluate →</button>
@@ -59,6 +64,7 @@
             <button id="save-btn" class="primary small" style="display:none;">💾 Save this run</button>
           </div>
         </div>
+        <p id="scope-disclaimer" class="disclaimer"></p>
         <div id="knockout-reason" class="ko-reason" style="display:none;"></div>
         <div class="cat-scores" id="cat-scores"><!-- bars inserted by JS --></div>
       </div>

@@ -259,4 +259,4 @@ class TestSampleE2EScoring:
         s1 = score_strategy(metrics, mc1, trades_count=report.rows_received, outliers_tagged=report.outliers_tagged)
         s2 = score_strategy(metrics, mc2, trades_count=report.rows_received, outliers_tagged=report.outliers_tagged)
         assert s1.final_score == s2.final_score
-        assert seed1 == seed2 == 42
+        assert seed1 == seed2 == "42"

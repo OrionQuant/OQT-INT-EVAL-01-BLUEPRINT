@@ -36,6 +36,16 @@ button.primary.small{padding:.35rem .8rem;font-size:.85rem;margin-top:.5rem;}
 .status{margin-top:.6rem;font-size:.85rem;color:var(--muted);min-height:1.2em;}
 .status.error{color:var(--bad);}
 .status.ok{color:var(--good);}
+.disclaimer{
+  margin:.85rem 0 0;
+  padding:.65rem .8rem;
+  font-size:.78rem;
+  line-height:1.35;
+  color:var(--muted);
+  border-left:3px solid var(--warn);
+  background:rgba(255,181,71,.08);
+  border-radius:0 8px 8px 0;
+}
 
 .score-card{background:linear-gradient(135deg,var(--panel),#0f1630);}
 .score-top{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;}

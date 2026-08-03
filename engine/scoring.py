@@ -10,7 +10,6 @@ Pipeline:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Optional, Tuple
 
 import numpy as np
@@ -22,7 +21,6 @@ from .models import (
     MCTestResult,
     PenaltiesApplied,
     ScoringResult,
-    Trade,
 )
 
 EPS = 1e-9
@@ -50,24 +48,9 @@ def _piecewise_linear(x: float, points: Tuple[Tuple[float, float], ...]) -> floa
     """Piecewise linear interpolation through sorted (x_i, y_i) anchor points.
 
     Clamps the output between min and max anchor y-values.
+    For 'higher is worse' metrics, pass decreasing y-anchors directly
+    (e.g. ((3, 10), (15, 0))) — Fix #11 removed the duplicate reverse helper.
     """
-    pts = sorted(points, key=lambda p: p[0])
-    xs = [p[0] for p in pts]
-    ys = [p[1] for p in pts]
-    if x <= xs[0]:
-        return ys[0]
-    if x >= xs[-1]:
-        return ys[-1]
-    for i in range(len(pts) - 1):
-        if xs[i] <= x <= xs[i + 1]:
-            t = (x - xs[i]) / (xs[i + 1] - xs[i] + EPS)
-            return ys[i] + t * (ys[i + 1] - ys[i])
-    return ys[-1]
-
-
-def _reverse_piecewise(x: float, points: Tuple[Tuple[float, float], ...]) -> float:
-    """Like piecewise linear but reverses the y-axis mapping for 'higher is
-    worse' metrics."""
     pts = sorted(points, key=lambda p: p[0])
     xs = [p[0] for p in pts]
     ys = [p[1] for p in pts]
@@ -215,9 +198,9 @@ def _score_sanity(metrics: Metrics) -> float:
     s_tr = _sigmoid(ra.tail_ratio, x0=1.0, k=4.0)
     if ra.tail_ratio <= 0.7:
         s_tr = min(s_tr, 2.0)
-    # Max loss streak: reverse piecewise ≤3→10, 6→6, 10→2, >15→0
+    # Max loss streak: decreasing anchors (higher streak → lower score)
     ls_pts = ((3, 10.0), (6, 6.0), (10, 2.0), (15, 0.0))
-    s_ls = _reverse_piecewise(float(bv.max_loss_streak), ls_pts)
+    s_ls = _piecewise_linear(float(bv.max_loss_streak), ls_pts)
 
     return 0.35 * s_sk + 0.25 * s_ku + 0.20 * s_tr + 0.20 * s_ls
 
@@ -231,10 +214,10 @@ def _score_sufficiency(metrics: Metrics, trades_count: int, outliers_tagged: int
         s_n = 0.0
     else:
         s_n = _piecewise_linear(float(N), n_pts)
-    # Outlier fraction (reverse): ≤1%→10, 5%→6, 15%→2, >25%→0
+    # Outlier fraction (higher is worse): ≤1%→10, 5%→6, 15%→2, >25%→0
     frac = outliers_tagged / max(1, trades_count)
     of_pts = ((0.01, 10.0), (0.05, 6.0), (0.15, 2.0), (0.25, 0.0))
-    s_of = _reverse_piecewise(frac, of_pts)
+    s_of = _piecewise_linear(frac, of_pts)
     return 0.60 * s_n + 0.40 * s_of
 
 
@@ -244,7 +227,7 @@ def _score_sufficiency(metrics: Metrics, trades_count: int, outliers_tagged: int
 
 
 def _apply_penalties(
-    metrics: Metrics, mc: MonteCarloResult, raw_score: float
+    metrics: Metrics, mc: MonteCarloResult
 ) -> Tuple[PenaltiesApplied, float]:
     """Compute individual penalty factors (each ∈ [0.5, 1.0]) + product P.
 
@@ -336,7 +319,7 @@ def score_strategy(
     raw = float(np.clip(raw, 0.0, 10.0))
 
     # (4) Multiplicative penalties
-    penalties, P = _apply_penalties(metrics, mc, raw)
+    penalties, P = _apply_penalties(metrics, mc)
 
     # (5) Final integer score 0..100 + label
     final = int(round(np.clip(10.0 * raw * P, 0.0, 100.0)))

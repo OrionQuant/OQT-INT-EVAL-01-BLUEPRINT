@@ -7,6 +7,12 @@ from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+DISCLAIMER_TEXT = (
+    "Notice: True Walk-Forward Validation and Purged Cross-Validation require strategy engine "
+    "integration and underlying bar/tick data. The overfitting risk reported here is a bounded "
+    "estimate derived exclusively from static trade-history analysis."
+)
+
 
 # --------------------------------------------------------------------------- #
 # Ingestion / Trade level
@@ -27,6 +33,7 @@ class Trade(BaseModel):
     commission: float = 0.0
     swap: float = 0.0
     pnl: float
+    capped_pnl: Optional[float] = None
     balance_after: Optional[float] = None
     entry_notional: float
     is_outlier: bool = False
@@ -97,6 +104,41 @@ class RiskAdjustedMetrics(BaseModel):
     cvar_95: float
     annualised: bool
     avg_trades_per_year: float
+    # Module 5: Probabilistic Sharpe Ratio — N_obs = T. Higher is better.
+    probabilistic_sharpe_ratio: Optional[float] = None
+    # Module 5: Deflated Sharpe Ratio — N_trials is user-provided. Lower than PSR.
+    deflated_sharpe_ratio: Optional[float] = None
+    psr_reference_sharpe: float = 0.0
+    dsr_n_trials: Optional[int] = None
+
+
+# --------------------------------------------------------------------------- #
+# Module 3: CUSUM + Regime shift checks on realized return series
+# (Report-analysis layer — operates on closed trades only; no bar data).
+# --------------------------------------------------------------------------- #
+
+class CUSUMStat(BaseModel):
+    """Two-sided CUSUM run on per-trade returns R_i."""
+
+    cumsum_pos_peak: float = 0.0    # max value of CUSUM+
+    cumsum_neg_peak: float = 0.0    # min value of CUSUM− (negative magnitude)
+    threshold_hit: bool = False     # True if either side crossed threshold
+    n_regime_shifts_detected: int = 0  # cumulative crossings of ±threshold
+    threshold_used: float = 0.0
+
+
+class RegimeCheck(BaseModel):
+    """Module 3 output: CUSUM + subsample stability checks."""
+
+    cusum_first_half: Optional[CUSUMStat] = None
+    cusum_second_half: Optional[CUSUMStat] = None
+    cusum_full: Optional[CUSUMStat] = None
+    # R_first_half_mean - R_second_half_mean
+    mean_return_gap: Optional[float] = None
+    # Sharpe-first-half minus Sharpe-second-half (per-trade raw, not annual)
+    sharpe_half_gap: Optional[float] = None
+    # Boolean: flagged as unstable if gap > threshold or CUSUM hit
+    regime_unstable_flag: bool = False
 
 
 class BehaviouralMetrics(BaseModel):
@@ -108,6 +150,8 @@ class BehaviouralMetrics(BaseModel):
     worst_trade: float
     profitable_month_fraction: Optional[float] = None
     monthly_return_volatility: Optional[float] = None
+    # Module 3 attaches here:
+    regime_check: Optional[RegimeCheck] = None
 
 
 class Metrics(BaseModel):
@@ -206,7 +250,7 @@ class Scorecard(BaseModel):
     id: Optional[str] = None
     name: str = "unnamed"
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    seed: Optional[int] = None
+    seed: Optional[str] = None
     input_file: InputFileInfo
     cleaning_report: CleaningReport
     metrics: Metrics
@@ -215,4 +259,6 @@ class Scorecard(BaseModel):
     scoring: ScoringResult
     equity_curve: List[EquityPoint]
     monthly_returns: Dict[str, float] = Field(default_factory=dict)
-    version: str = "1.0"
+    # Report-analysis layer — explicit disclaimer for every dashboard/report.
+    disclaimer: str = DISCLAIMER_TEXT
+    version: str = "1.1"

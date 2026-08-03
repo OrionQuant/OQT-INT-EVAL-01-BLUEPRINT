@@ -5,7 +5,6 @@ from __future__ import annotations
 import csv as _csv
 import os
 import uuid
-from datetime import timedelta
 from typing import List, Tuple
 
 import numpy as np
@@ -29,43 +28,42 @@ def _coerce_side(raw) -> str | None:
 
 
 def _coerce_number(x):
+    """Parse a number that may use US (1,000.00) or European (1.000,00) formatting.
+
+    Delegates to the engine-level number parser for consistency with HTML
+    ingestion (single source of truth for locale-aware parsing).
+    """
     if x is None:
         return np.nan
     if isinstance(x, (int, float, np.integer, np.floating)):
         return float(x)
-    s = str(x).replace("\u00a0", "").replace(",", "").replace(" ", "").strip()
-    if s in {"", "-", "—", "n/a"}:
-        return np.nan
-    # Strip leading/trailing currency-ish non-numeric characters
-    while s and not (s[0].isdigit() or s[0] in "+-."):
-        s = s[1:]
-    while s and not (s[-1].isdigit() or s[-1] == "."):
-        s = s[:-1]
-    try:
-        return float(s)
-    except (ValueError, TypeError):
-        return np.nan
+    from .ingestion import _parse_number
+    out = _parse_number(x)
+    return np.nan if out is None else float(out)
 
 
 def _coerce_timestamp(raw) -> pd.Timestamp | None:
+    """Parse a timestamp with European-format preference (dayfirst=True, Fix #3)."""
     if raw is None or (isinstance(raw, float) and np.isnan(raw)):
         return None
     if isinstance(raw, (pd.Timestamp, np.datetime64)):
         ts = pd.Timestamp(raw)
+    elif isinstance(raw, str):
+        # Use the engine-level EU parser for string -> datetime preference
+        from .ingestion import _parse_timestamp_eu
+        out = _parse_timestamp_eu(raw)
+        if out is None:
+            return None
+        ts = pd.Timestamp(out)
     else:
         try:
-            ts = pd.Timestamp(_dateparser.parse(str(raw)))
-        except (ValueError, TypeError, OverflowError):
-            # Numeric → Excel serial
-            try:
-                n = float(raw)
-            except (ValueError, TypeError):
-                return None
-            if 1_000 < n < 100_000:  # plausible Excel serial
-                ts = pd.Timestamp("1899-12-30") + pd.Timedelta(days=n)
-            else:
-                # epoch ms
-                ts = pd.Timestamp(n, unit="ms") if n > 1e12 else pd.Timestamp(n, unit="s")
+            n = float(raw)
+        except (ValueError, TypeError):
+            return None
+        if 1_000 < n < 100_000:
+            ts = pd.Timestamp("1899-12-30") + pd.Timedelta(days=n)
+        else:
+            ts = pd.Timestamp(n, unit="ms") if n > 1e12 else pd.Timestamp(n, unit="s")
     if ts.tzinfo is None:
         ts = ts.tz_localize("UTC")
     else:
@@ -165,14 +163,26 @@ def clean_raw_rows(
         step2_rows.append(r)
 
     # ----------------------------------------------------------------------- #
-    # Step 3: Deduplicate (exact-hash)
+    # Step 3: Deduplicate (exact-hash), while preserving original input index
+    #         so later sort order can be deterministic across runs (Fix #5).
     # ----------------------------------------------------------------------- #
     seen_hashes = set()
     step3_rows: List[dict] = []
-    for r in step2_rows:
-        h = hash(tuple(sorted((k, (tuple(v) if isinstance(v, (list, tuple)) else v))
-                         for k, v in r.items()
-                         if k != "_order")))
+    for order, r in enumerate(step2_rows):
+        if "_input_idx" not in r:
+            r["_input_idx"] = order
+        h = hash(
+            tuple(
+                sorted(
+                    (
+                        k,
+                        (tuple(v) if isinstance(v, (list, tuple)) else v),
+                    )
+                    for k, v in r.items()
+                    if k not in ("_order", "_input_idx")
+                )
+            )
+        )
         if h in seen_hashes:
             report.rows_deduped += 1
             continue
@@ -180,9 +190,10 @@ def clean_raw_rows(
         step3_rows.append(r)
 
     # ----------------------------------------------------------------------- #
-    # Step 4: Stable sort by timestamp ascending
+    # Step 4: Stable deterministic sort by timestamp + original input order
+    #         (Fix #5 — use _input_idx, not id(r), for cross-run determinism)
     # ----------------------------------------------------------------------- #
-    step4_rows = sorted(step3_rows, key=lambda r: (r["timestamp"], id(r)))
+    step4_rows = sorted(step3_rows, key=lambda r: (r["timestamp"], int(r.get("_input_idx", 0))))
 
     # ----------------------------------------------------------------------- #
     # Step 5: Negative-quantity flip
@@ -196,19 +207,36 @@ def clean_raw_rows(
 
     # ----------------------------------------------------------------------- #
     # Step 6: PnL imputation (gross + commission + swap if Net missing)
+    # Fix #7:
+    #   * Parens around the `r["pnl"] == 0` check so NaN OR (zero with
+    #     plausible naive) triggers the branch.
+    #   * Consistent fee sign: commission and swap are almost always recorded
+    #     as negative values (costs) in broker exports. `fees = commission +
+    #     swap` is negative-valued; to go from gross→net we ADD the (negative)
+    #     fee row, which is equivalent to subtracting the absolute cost.
+    #     Never abs() fees or subtract fees twice.
     # ----------------------------------------------------------------------- #
     step6_rows = []
     for r in step5_rows:
         direction = +1 if r["side"] == "long" else -1
         naive = direction * r["quantity"] * (r["exit_price"] - r["entry_price"])
-        fees = (r["commission"] if np.isfinite(r["commission"]) else 0.0) + \
-               (r["swap"]       if np.isfinite(r["swap"])       else 0.0)
+        commission = float(r["commission"]) if np.isfinite(r.get("commission")) else 0.0
+        swap = float(r["swap"]) if np.isfinite(r.get("swap")) else 0.0
+        fees = commission + swap  # will typically be negative-valued
 
-        if (not np.isfinite(r["pnl"])) or r["pnl"] == 0 and abs(naive) > 1e-9:
-            if np.isfinite(r["gross_pnl"]):
-                r["pnl"] = r["gross_pnl"] + fees
+        pnl_missing = not np.isfinite(r["pnl"])
+        pnl_zero_but_data_available = (
+            (np.isfinite(r["pnl"])) and abs(float(r["pnl"])) < 1e-12 and
+            (abs(naive) > 1e-9 or (np.isfinite(r.get("gross_pnl")) and abs(float(r["gross_pnl"])) > 1e-9))
+        )
+        if pnl_missing or pnl_zero_but_data_available:
+            if np.isfinite(r.get("gross_pnl")):
+                # gross_pnl already excludes cost (or is explicitly gross)
+                # net = gross + fees (since fees are stored as negative)
+                r["pnl"] = float(r["gross_pnl"]) + fees
             else:
-                r["pnl"] = naive - abs(fees) if fees < 0 else naive - fees
+                # naive (raw price × qty) is gross-of-fees; go net by adding fees
+                r["pnl"] = naive + fees
         step6_rows.append(r)
 
     # ----------------------------------------------------------------------- #
@@ -227,24 +255,34 @@ def clean_raw_rows(
         step7_rows.append(r)
 
     # ----------------------------------------------------------------------- #
-    # Step 8: Outlier tagging via |x - median| > 10 * MAD (capped copies for
-    #         scoring; originals retained for reporting)
+    # Step 8: Outlier tagging via |x - median| > K * MAD, plus soft capping.
+    # Fix #8:
+    #   * Every trade row receives a `capped_pnl` value clamped to
+    #     [median ∓ K·MAD] regardless of outlier status.
+    #   * Rows exceeding the threshold receive `is_outlier=True` + count bump.
+    #   * Downstream metrics.py and monte_carlo.py consume capped_pnl when
+    #     computing any series the scoring uses for grading. Raw `pnl` stays
+    #     attached for audit / display transparency.
     # ----------------------------------------------------------------------- #
     pnls = np.array([r["pnl"] for r in step7_rows], dtype=float)
     if pnls.size == 0:
         step8_rows = step7_rows
     else:
-        med = np.median(pnls)
-        mad = np.median(np.abs(pnls - med))
+        med = float(np.median(pnls))
+        mad = float(np.median(np.abs(pnls - med)))
         cap = mad_cap_factor * mad if mad > 0 else 1e-9
+        lower = med - cap
+        upper = med + cap
         step8_rows = []
-        for r in step7_rows:
-            if abs(r["pnl"] - med) > cap:
-                r = dict(r)
+        for raw_r in step7_rows:
+            r = dict(raw_r)
+            x = float(r["pnl"])
+            r["capped_pnl"] = float(max(lower, min(upper, x)))
+            if abs(x - med) > cap:
                 r["is_outlier"] = True
                 report.outliers_tagged += 1
-                # Soft-cap (for scoring the outlier set won't be used directly
-                # by the user; we leave the original pnl intact and tag.)
+            else:
+                r.setdefault("is_outlier", False)
             step8_rows.append(r)
 
     # ----------------------------------------------------------------------- #
@@ -265,25 +303,34 @@ def clean_raw_rows(
         entry_notional = qty * ep
 
         if has_balance_col:
-            # Trust the provided balance after the trade
             bal_after = float(balances[idx])
         else:
             running_balance = running_balance + float(r["pnl"])
             bal_after = running_balance
 
+        # Fix #9: compute inter-trade interval as a simple total_seconds().
+        # The previous code subtracted pd.Timestamp(0) and called to_pydatetime()
+        # on a Timestamp (which is already a timestamp delta on the left-hand
+        # result), always threw and was swallowed by `except Exception: pass`.
         duration_s = 0.0
         if previous_timestamp is not None:
             try:
-                delta: timedelta = (r["timestamp"] - previous_timestamp).to_pydatetime() - pd.Timestamp(0).to_pydatetime()
-                duration_s = max(0.0, (r["timestamp"] - previous_timestamp).total_seconds())
-            except Exception:
+                diff = r["timestamp"] - previous_timestamp
+                if hasattr(diff, "total_seconds"):
+                    duration_s = float(diff.total_seconds())
+                else:
+                    duration_s = 0.0
+            except (TypeError, ValueError, AttributeError, ArithmeticError):
                 duration_s = 0.0
         else:
+            # First trade: synthetic 1s anchor so we never report 0 for row 1
             duration_s = 1.0
         if duration_s <= 0.0:
             duration_s = 1.0
             if hasattr(r, "get") and r.get("open_time") and r.get("open_time") == r["timestamp"]:
                 report.rows_flagged_zero_duration += 1
+
+        capped_pnl = float(r.get("capped_pnl", r["pnl"]))
 
         trades.append(Trade(
             position_id=str(r["position_id"]) if r.get("position_id") else None,
@@ -298,6 +345,7 @@ def clean_raw_rows(
             commission=float(r["commission"]) if np.isfinite(r.get("commission")) else 0.0,
             swap=float(r["swap"])           if np.isfinite(r.get("swap"))       else 0.0,
             pnl=float(r["pnl"]),
+            capped_pnl=capped_pnl,
             balance_after=bal_after,
             entry_notional=entry_notional,
             is_outlier=bool(r.get("is_outlier", False)),
