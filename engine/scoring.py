@@ -93,6 +93,20 @@ def apply_knockouts(metrics: Metrics) -> Optional[ScoringResult]:
             f"Maximum Drawdown magnitude {MDD*100:.1f}% exceeds 35% — catastrophic capital loss inadmissible per risk mandate."
         )
 
+    # DSR hard knockout: if the deflated Sharpe Ratio (after trial deflation)
+    # is very small, the result indicates severe overfitting — instant fail.
+    dsr_val = metrics.risk_adj.deflated_sharpe_ratio if hasattr(metrics.risk_adj, 'deflated_sharpe_ratio') else None
+    if dsr_val is not None and dsr_val < 0.05:
+        reasons.append(
+            f"Corrected DSR {dsr_val:.3f} < 0.05 — automatic evaluation FAIL (insufficient deflated significance)."
+        )
+    # Mark-to-market (MTM) hard knockout: continuous MTM drawdown > 25% fails
+    mtm = getattr(metrics.drawdown, "mtm_max_drawdown", None)
+    if mtm is not None and abs(mtm) > 0.25:
+        reasons.append(
+            f"Continuous MTM max drawdown {abs(mtm)*100:.1f}% exceeds 25% — fail due to floating equity risk."
+        )
+
     if not reasons:
         return None
 
@@ -245,13 +259,25 @@ def _apply_penalties(
 
     n = metrics.basic.total_trades
     p_n50 = max(0.85, n / 50.0) if n < 50 else 1.0
+    # Martingale signature penalty: penalise asymmetric payoff profiles
+    b = metrics.basic
+    p_mart = 1.0
+    try:
+        if b.win_rate > 0.75 and (b.average_loss / max(EPS, b.average_win)) > 2.0:
+            ratio = b.average_loss / max(EPS, b.average_win)
+            import math as _math
 
-    P = p_mdd * p_cvar * p_rr * p_n50
+            p_mart = float(max(0.01, min(1.0, _math.exp(-1.5 * ratio - 2.0))))
+    except Exception:
+        p_mart = 1.0
+
+    P = p_mdd * p_cvar * p_rr * p_n50 * p_mart
     penalties = PenaltiesApplied(
         mdd_40pct=float(p_mdd),
         cvar_10pct=float(p_cvar),
         mc_rr=float(p_rr),
         n_50=float(p_n50),
+        martingale=float(p_mart),
         penalty_product=float(P),
     )
     return penalties, float(P)
@@ -308,13 +334,16 @@ def score_strategy(
     s_suf = _score_sufficiency(metrics, trades_count, outliers_tagged)
 
     # (3) Weighted raw score ∈ [0, 10]
+    # Reweighted composite per proposal: elevate Robustness & Overfitting to 35%,
+    # combine Performance & Returns into 35%, Drawdown & Tail Risk 15%,
+    # Execution-related checks (sanity + sufficiency) combined to 15%.
     raw = (
-        0.25 * s_profit
-        + 0.25 * s_ra
-        + 0.20 * s_dd
-        + 0.15 * s_rob
-        + 0.10 * s_san
-        + 0.05 * s_suf
+        0.175 * s_profit
+        + 0.175 * s_ra
+        + 0.15 * s_dd
+        + 0.35 * s_rob
+        + 0.075 * s_san
+        + 0.075 * s_suf
     )
     raw = float(np.clip(raw, 0.0, 10.0))
 

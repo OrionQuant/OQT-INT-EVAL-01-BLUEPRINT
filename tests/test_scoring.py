@@ -202,8 +202,8 @@ class TestScoreSanity:
         mc = _base_mc()
         s = score_strategy(m, mc, trades_count=100, outliers_tagged=0)
         cats = s.category_scores.model_dump()
-        w = {"profitability": 0.25, "risk_adj": 0.25, "drawdown": 0.20,
-             "robustness": 0.15, "sanity": 0.10, "sufficiency": 0.05}
+        w = {"profitability": 0.175, "risk_adj": 0.175, "drawdown": 0.15,
+             "robustness": 0.35, "sanity": 0.075, "sufficiency": 0.075}
         raw_reconstructed = sum(w[c] * cats[c] for c in w)
         # Reconstructed should match raw_score to floating tolerance
         assert raw_reconstructed == pytest.approx(s.raw_score, rel=1e-3)
@@ -249,7 +249,7 @@ class TestSampleE2EScoring:
         raw = (FIXTURES / "sample_trades.csv").read_bytes()
         rows, _, _, _ = ingest_file(raw, "s.csv")
         trades, report = clean_raw_rows(rows, evaluations_dir=str(tmp_path))
-        metrics, _, _ = compute_all_metrics(trades, start_balance=10000.0, n_trials=1)
+        metrics, _, _ = compute_all_metrics(trades, start_balance=10000.0, n_trials=2, sr_trials=[0.05, 0.06])
         rng1, seed1 = make_rng(42)
         rng2, seed2 = make_rng(42)
         mc1 = run_monte_carlo(trades, rng1, start_balance=10000.0, iterations=200,

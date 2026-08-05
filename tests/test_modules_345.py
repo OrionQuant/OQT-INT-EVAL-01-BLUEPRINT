@@ -51,7 +51,7 @@ class TestModule3CUSUM:
 
     def test_attached_to_metrics(self, tmp_path):
         trades, _ = _sample_trades(tmp_path)
-        metrics, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=10)
+        metrics, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=10, sr_trials=[0.10]*10)
         assert metrics.behav.regime_check is not None
         assert metrics.behav.regime_check.cusum_full is not None
         assert isinstance(metrics.behav.regime_check.regime_unstable_flag, bool)
@@ -72,7 +72,7 @@ class TestModule4MovingBlock:
 
     def test_deterministic_given_seed(self, tmp_path):
         trades, _ = _sample_trades(tmp_path)
-        metrics, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=5)
+        metrics, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=5, sr_trials=[0.05]*5)
         rng1, _ = make_rng(42)
         rng2, _ = make_rng(42)
         mb1 = run_moving_block_bootstrap(
@@ -91,7 +91,7 @@ class TestModule4MovingBlock:
 
     def test_pipeline_includes_moving_block(self, tmp_path):
         raw = (FIXTURES / "sample_trades.csv").read_bytes()
-        cfg = EvaluateConfig(start_balance=10_000.0, mc_iterations=30, n_trials=25)
+        cfg = EvaluateConfig(start_balance=10_000.0, mc_iterations=30, n_trials=25, sr_trials=[0.05]*25)
         card = _run_pipeline(raw, "s.csv", config=cfg, seed="99", strategy_name="t")
         assert card.moving_block is not None
         assert card.moving_block.iterations == 30
@@ -119,7 +119,7 @@ class TestModule5RequiredNTrials:
         trades, _ = _sample_trades(tmp_path)
         n_obs = len(trades)
         # Deliberately set n_trials ≠ n_obs
-        m, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=7)
+        m, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=7, sr_trials=[0.05]*7)
         assert m.risk_adj.dsr_n_trials == 7
         assert m.risk_adj.dsr_n_trials != n_obs or n_obs == 7
         assert m.basic.total_trades == n_obs

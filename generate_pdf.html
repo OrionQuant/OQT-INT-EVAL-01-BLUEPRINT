@@ -1,0 +1,472 @@
+Here is the updated HTML code configured to format this proposal into a clean, 5-page PDF document when printed from your browser.
+
+### PDF Setup Instructions:
+
+1. Save the code below into a file named **`DSR_Architecture_Proposal.html`**.
+2. Open **`DSR_Architecture_Proposal.html`** in Google Chrome or Microsoft Edge.
+3. Press **Ctrl + P** (or Cmd + P on Mac).
+4. Set **Destination** to **Save as PDF**.
+5. Ensure **Margins** are set to **Default** and **Background graphics** is **checked**.
+6. Save the PDF.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Quantitative Strategy Evaluation Framework - Architecture Proposal</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 18mm 15mm 18mm 15mm;
+        }
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            color: #111111;
+            line-height: 1.45;
+            font-size: 9.5pt;
+            margin: 0;
+            padding: 0;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+        .header {
+            border-bottom: 2px solid #000;
+            padding-bottom: 6px;
+            margin-bottom: 14px;
+        }
+        .header h1 {
+            font-size: 15pt;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .meta-table {
+            width: 100%;
+            margin-bottom: 10px;
+            font-size: 8.5pt;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 6px;
+        }
+        .meta-table td {
+            padding: 2px 0;
+        }
+        h2 {
+            font-size: 11pt;
+            border-bottom: 1px solid #000;
+            padding-bottom: 2px;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+        h3 {
+            font-size: 10pt;
+            margin-top: 10px;
+            margin-bottom: 4px;
+        }
+        p {
+            margin: 0 0 6px 0;
+            text-align: justify;
+        }
+        ul, ol {
+            margin: 0 0 6px 0;
+            padding-left: 18px;
+        }
+        li {
+            margin-bottom: 3px;
+        }
+        .math-block {
+            background-color: #f8f9fa;
+            border-left: 3px solid #333;
+            padding: 6px 10px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 8.5pt;
+            margin: 6px 0;
+            white-space: pre-wrap;
+        }
+        .diagram-block {
+            background-color: #f1f3f5;
+            border: 1px dashed #666;
+            padding: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 7.5pt;
+            line-height: 1.2;
+            margin: 8px 0;
+            white-space: pre;
+        }
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 8pt;
+        }
+        table.data-table th {
+            background-color: #222;
+            color: #fff;
+            text-align: left;
+            padding: 5px 6px;
+            font-weight: bold;
+            border: 1px solid #222;
+        }
+        table.data-table td {
+            padding: 4px 6px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+        }
+        .center {
+            text-align: center;
+        }
+        .bold {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- PAGE 1 -->
+    <div class="header">
+        <h1>Technical Design Proposal</h1>
+        <div style="font-size: 10pt; font-weight: bold;">Quantitative Strategy Evaluation Framework</div>
+    </div>
+
+    <table class="meta-table">
+        <tr>
+            <td><strong>Document Title:</strong> Mathematical Foundations of Strategy Evaluation</td>
+            <td><strong>Target Audience:</strong> CTO & Quantitative Research Team</td>
+        </tr>
+        <tr>
+            <td><strong>Author:</strong> Harshit Kumar</td>
+            <td><strong>Scope:</strong> DSR/PSR Verification, Risk Engine & Overfitting Framework</td>
+        </tr>
+    </table>
+
+    <h2>Executive Summary</h2>
+    <p>This proposal establishes a mathematically rigorous architecture for the quantitative strategy evaluation engine. It addresses critical structural and statistical vulnerabilities identified in prior iterations, specifically regarding selection bias under multiple testing, path-dependent risk estimation, and asymmetric return distributions.</p>
+    <p>The document provides:</p>
+    <ol>
+        <li>A formal proof validating the CTO's critique regarding dimensional inconsistency in the Probabilistic Sharpe Ratio (PSR) and Deflated Sharpe Ratio (DSR) implementations.</li>
+        <li>A corrected mathematical specification for per-trade statistical inference, dynamic reference scaling, and n_trials parameter validation.</li>
+        <li>A path-dependent mark-to-market risk framework demonstrating why closed-trade drawdown fails for grid and martingale strategies.</li>
+        <li>An analysis of the statistical fragility of Profit Factor and Win Rate, alongside higher-order distributional alternatives (Sortino, Calmar, Omega, and Adjusted Sharpe Ratios).</li>
+        <li>A backtest overfitting framework incorporating Combinatorially Symmetric Cross-Validation (CSCV), Probability of Backtest Overfitting (PBO), Walk-Forward Efficiency (WFE), and Purged/Embargoed Cross-Validation.</li>
+        <li>A concrete architectural framework distinguishing academic literature from engineering design choices.</li>
+    </ol>
+
+    <h2>1. Mathematical Foundations of PSR and DSR</h2>
+
+    <h3>1.1 Academic Context</h3>
+    <p>The Probabilistic Sharpe Ratio (PSR) and Deflated Sharpe Ratio (DSR) were introduced by David H. Bailey and Marcos López de Prado (2012, 2014) to address two fundamental flaws in traditional performance analysis: (1) non-normality of returns (skewness and kurtosis violating Gaussian assumptions), and (2) multiple testing selection bias (inflation of backtested performance as a function of trials tested).</p>
+
+    <h3>1.2 Verification of CTO Critique: Annualized vs. Per-Trade Frequency Inconsistency</h3>
+    <p>The CTO's critique regarding time-scaling double counting is <strong>mathematically correct</strong>.</p>
+
+    <p><strong>Formal Proof of the Double-Counting Error:</strong></p>
+    <p>Let r_t represent trade-level returns over N discrete observations. The empirical per-trade Sharpe ratio is defined as SR_trade = mean(r) / std(r). Let K = ATPY represent Average Trades Per Year. The standard annualization transform scales the point estimate by sqrt(K): SR_annual = SR_trade * sqrt(K).</p>
+    <p>The asymptotic normal test statistic Z in PSR (Bailey & López de Prado, 2012) is Z = (SR - SR*) * sqrt(N - 1) / sigma_SR. Under Gaussian returns, sigma_SR = sqrt(1 + 0.5 * SR^2).</p>
+    <p>If an engineer feeds the annualized Sharpe ratio SR_annual into the PSR formula while simultaneously setting sample size to total trade count N, the test statistic expands to:</p>
+
+    <div class="math-block">Z_flawed = (SR_trade * sqrt(K) - SR*_annual) * sqrt(N - 1) / sqrt(1 + 0.5 * (SR_trade * sqrt(K))^2)</div>
+
+    <p>Because N represents total trades, total time in years is T_years = N / K. Substituting N = K * T_years shows that Z_flawed scales the numerator by an extra factor of sqrt(K) = sqrt(ATPY) compared to evaluating purely in annual or per-trade units.</p>
+
+    <p><strong>Numerical Verification:</strong></p>
+    <p>Evaluating the benchmark case (SR_trade = 0.10, N = 250 trades, K = 250 trades/yr):</p>
+    <ul>
+        <li><strong>Flawed Implementation (Annualized SR with Per-Trade N):</strong> Yields Z = 16.632, leading to <strong>PSR = 1.0000</strong> (100% false statistical certainty).</li>
+        <li><strong>Correct Per-Trade Implementation:</strong> Yields Z = 1.5740, leading to <strong>PSR = 0.9422</strong> (94.22% confidence).</li>
+    </ul>
+
+    <!-- PAGE 2 -->
+    <div class="page-break"></div>
+    <div class="header">
+        <h1>Technical Design Proposal (Cont.)</h1>
+        <div style="font-size: 8.5pt;">Section 1: DSR Formulation & Guardrails | Section 2: MTM Risk Framework</div>
+    </div>
+
+    <h3>1.3 Correct Mathematical Formulation for DSR Calculation</h3>
+    <p>To resolve dimensional inconsistency, all statistical inputs must be aligned to per-trade periodicity.</p>
+
+    <p><strong>Step 1: Estimating Per-Trade Higher Moments</strong></p>
+    <div class="math-block">Skewness (gamma_1) = [ (1/N) * sum( (r - mean_r)^3 ) ] / sigma^3
+Excess Kurtosis (gamma_2) = [ (1/N) * sum( (r - mean_r)^4 ) ] / sigma^4 - 3</div>
+
+    <p><strong>Step 2: Per-Trade Probabilistic Sharpe Ratio (PSR)</strong></p>
+    <div class="math-block">PSR(SR*_trade) = Phi( [ (SR_trade - SR*_trade) * sqrt(N - 1) ] / sqrt( 1 - gamma_1*SR_trade + ((gamma_2)/4)*SR_trade^2 ) )</div>
+
+    <p><strong>Step 3: Expected Maximum Sharpe Ratio E[max SR] Under Multiple Testing</strong></p>
+    <p>When n_trials strategy variants are evaluated, Extreme Value Theory dictates the expected maximum Sharpe under the null hypothesis (H0: True SR = 0):</p>
+    <div class="math-block">E[max SR] = mean(SR) + sigma_SR * [ (1 - gamma) * Z_inv(1 - 1/n_trials) + gamma * Z_inv(1 - 1/(n_trials * e)) ]</div>
+    <p>Where gamma ≈ 0.5772156649 (Euler-Mascheroni constant) and Z_inv is the inverse standard normal CDF.</p>
+
+    <p><strong>Step 4: Correct sigma_SR Scaling</strong></p>
+    <p>sigma_SR must be calculated as the empirical standard deviation of per-trade Sharpe ratios across all n_trials backtest variants:</p>
+    <div class="math-block">sigma_SR = sqrt( (1 / (n_trials - 1)) * sum( (SR_trade_k - mean_SR_trade)^2 ) )</div>
+
+    <p><strong>Step 5: Deflated Sharpe Ratio (DSR) Computation</strong></p>
+    <div class="math-block">SR*_ref = E[max SR]
+DSR = PSR(SR*_ref)</div>
+
+    <h3>1.4 Strict Guardrails for n_trials</h3>
+    <p>If n_trials = 1, EVT limits collapse. In strategy development, parameter tuning creates selection bias. Enforce:</p>
+    <ol>
+        <li><strong>No Default Argument:</strong> The parameter signature must require an explicit integer (`n_trials: int`).</li>
+        <li><strong>Explicit Validation:</strong> Enforce n_trials >= 2. Throw `ValueError("n_trials must reflect total backtest iterations (N >= 2)")` if n_trials < 2.</li>
+    </ol>
+
+    <h2>2. Path-Dependent Drawdown Mechanics: Mark-to-Market vs. Closed-Trade</h2>
+
+    <h3>2.1 Failure of Closed-Trade Drawdown</h3>
+    <p>Closed-trade drawdown samples equity strictly when trades are liquidated. Grid and martingale strategies avoid closing losing positions, holding open floating losses while realizing small gains.</p>
+
+    <div class="diagram-block">
+  [Closed-Trade Equity]                     [Mark-to-Market Real Equity]
+Equity                                    Equity
+  |         /                             |         /
+  |        /                              |        /\  <-- Massive Floating Drawdown
+  |       /                               |       /  \     (60% Open-Equity Loss)
+  |      /                                |      /    \/\
+  |_____/                                 |_____/        \______
+  +------------------> Time               +----------------------> Time
+  (Hides catastrophic risk)               (Captures true risk profile)
+    </div>
+
+    <h3>2.2 Mathematical Formulation of Continuous Mark-to-Market Drawdown</h3>
+    <p>Mark-to-market equity E(t) sampled at interval dt includes unliquidated positions O(t):</p>
+    <div class="math-block">E(t) = E_0 + Realized_PnL(t) + sum_{j in O(t)} Unrealized_PnL_j(t)
+Peak P(t) = max_{tau <= t} E(tau)
+MtM Drawdown DD_MtM(t) = (P(t) - E(t)) / P(t)
+Max MtM Drawdown MDD_MtM = max_{t in [0, T]} DD_MtM(t)</div>
+
+    <!-- PAGE 3 -->
+    <div class="page-break"></div>
+    <div class="header">
+        <h1>Technical Design Proposal (Cont.)</h1>
+        <div style="font-size: 8.5pt;">Section 3: Metric Alternatives | Section 4: Backtest Overfitting Framework</div>
+    </div>
+
+    <h2>3. Fragility of Win Rate / Profit Factor & Alternative Metrics</h2>
+
+    <h3>3.1 Vulnerability of Profit Factor and Win Rate</h3>
+    <p>Profit Factor (PF = (WR / (1 - WR)) * (Avg_Win / Avg_Loss)) can be engineered to arbitrarily high values by setting tight take-profits (+1%) and wide stop-losses (-50%). Under normal noise, WR reaches 98%, producing PF = 0.98 * (98/2) = 48.0. This masks severe left-tail blow-up risk.</p>
+
+    <div class="diagram-block">
+       [Symmetric / Right-Skewed Return]              [Martingale Left-Skewed Return]
+  Probability                                   Probability
+       |               /\                            |                            /\
+       |              /  \                           |                           /  \
+       |             /    \                          |                          /    \
+       |   _________/______\________                 |  _______________________/______\
+       +------------------------------> Return       +----------------------------------> Return
+           (Bounded Left-Tail Losses)                   (Rare Catastrophic Blow-Up Loss)
+    </div>
+
+    <h3>3.2 Robust Quantitative Alternatives</h3>
+    <ul>
+        <li><strong>Sortino Ratio:</strong> Replaces total variance with downside semi-variance below target return tau.</li>
+        <li><strong>Calmar Ratio:</strong> Normalizes annualized return by maximum mark-to-market drawdown (Calmar = Return_annual / MDD_MtM).</li>
+        <li><strong>Omega Ratio:</strong> Evaluates cumulative gains vs. cumulative losses across the continuous CDF.</li>
+        <li><strong>Adjusted Sharpe Ratio:</strong> Penalizes raw Sharpe for negative skewness (gamma_1) and excess kurtosis (gamma_2):
+            <div class="math-block">SR_adj = SR * [ 1 + (gamma_1 / 6)*SR - (gamma_2 / 24)*SR^2 ]</div>
+        </li>
+    </ul>
+
+    <h2>4. Frameworks for Measuring Backtest Overfitting</h2>
+
+    <h3>4.1 Combinatorially Symmetric Cross-Validation (CSCV) and PBO</h3>
+    <p>CSCV (Bailey et al., 2014) partitions time-series returns into S equal blocks, forming C = Binomial(S, S/2) combinations of In-Sample (IS) and Out-of-Sample (OOS) splits.</p>
+
+    <div class="math-block">C = S! / [ ((S/2)!)^2 ]
+PBO = (1 / C) * sum( Indicator( Relative_Rank_OOS < 0.5 ) )</div>
+    <p>A PBO > 0.50 indicates that in-sample optimization selected parameters no better than random chance out-of-sample.</p>
+
+    <h3>4.2 Walk-Forward Validation</h3>
+    <div class="diagram-block">
+Timeline: [===== IS 1 =====][== OOS 1 ==]
+                   [===== IS 2 =====][== OOS 2 ==]
+                                      [===== IS 3 =====][== OOS 3 ==]
+    </div>
+    <div class="math-block">Walk-Forward Efficiency (WFE) = Mean_OOS_Return_Annual / Mean_IS_Return_Annual</div>
+
+    <h3>4.3 Purged and Embargoed Cross-Validation</h3>
+    <p>To prevent data leakage caused by overlapping position holdings and autoregressive memory (López de Prado, 2018):</p>
+    <div class="diagram-block">
+   Training Block              Purge Zone   Test Block   Embargo Zone      Training Block
+[===========================]  [  X X X  ] [==========]  [  E E E  ]  [===========================]
+    </div>
+    <ul>
+        <li><strong>Purging:</strong> Removes training labels that overlap in time with active testing trades.</li>
+        <li><strong>Embargoing:</strong> Removes training samples immediately following a testing block (e.g., 1-5% of samples).</li>
+    </ul>
+
+    <!-- PAGE 4 -->
+    <div class="page-break"></div>
+    <div class="header">
+        <h1>Technical Design Proposal (Cont.)</h1>
+        <div style="font-size: 8.5pt;">Section 5: Proposed Architecture & Scoring System</div>
+    </div>
+
+    <h2>5. Proposed Strategy Evaluation Architecture</h2>
+
+    <h3>5.1 Hard Knockout Gates (Non-Negotiable Fail States)</h3>
+    <p>A strategy triggering any gate receives an immediate evaluation <strong>FAIL</strong> regardless of returns:</p>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Hard Knockout Gate</th>
+                <th>Mathematical Threshold / Condition</th>
+                <th>Financial Justification</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Mark-to-Market DD Ceiling</strong></td>
+                <td>MDD_MtM > 0.25 (25.0%)</td>
+                <td>Eliminates strategies hiding open floating losses.</td>
+            </tr>
+            <tr>
+                <td><strong>Deflated Sharpe Floor</strong></td>
+                <td>DSR < 0.05 (with explicit n_trials)</td>
+                <td>Rejects strategies with < 5% probability of true skill.</td>
+            </tr>
+            <tr>
+                <td><strong>Overfitting Threshold</strong></td>
+                <td>PBO > 0.50 (50.0%)</td>
+                <td>Rejects setups where IS performance fails OOS.</td>
+            </tr>
+            <tr>
+                <td><strong>Sample Power Gate</strong></td>
+                <td>N_trades < 100 trades</td>
+                <td>Prevents small-sample noise from passing PSR bounds.</td>
+            </tr>
+            <tr>
+                <td><strong>Martingale Asymmetry Gate</strong></td>
+                <td>WR > 0.80 AND (Avg_Loss / Avg_Win) > 3.0</td>
+                <td>Disqualifies high-win-rate strategies with tail-risk exposure.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>5.2 Progressive Scoring Matrix (100-Point Rebalanced System)</h3>
+    <div class="math-block">Final Score = 0.35 * Score_Perf + 0.35 * Score_Rob + 0.15 * Score_Tail + 0.15 * Score_Exec</div>
+
+    <div class="diagram-block">
+                      +---------------------------------------+
+                      |     Total Strategy Score (100%)       |
+                      +---------------------------------------+
+                                          |
+        +------------------+--------------+------------------+------------------+
+        |                  |                                 |                  |
++---------------+  +---------------+                 +---------------+  +---------------+
+|  Performance  |  |  Robustness   |                 | Drawdown/Tail |  |   Execution   |
+|     (35%)     |  |     (35%)     |                 |  Risk (15%)   |  |   Risk (15%)  |
++---------------+  +---------------+                 +---------------+  +---------------+
+| - Sortino     |  | - Corrected DSR |                 | - MtM Max DD  |  | - Slippage    |
+| - Calmar      |  | - WFE Score   |                 | - Skewness    |  |   Sensitivity |
+| - Adj Sharpe  |  | - Purged CV   |                 | - Kurtosis    |  | - Friction    |
++---------------+  +---------------+                 +---------------+  +---------------+
+    </div>
+
+    <div class="math-block">
+Payoff Asymmetry Penalty Multiplier (psi):
+If WR > 0.75 and (Avg_Loss / Avg_Win) > 2.0:
+    psi = exp( -1.5 * ( (Avg_Loss / Avg_Win) - 2.0 ) )
+Else:
+    psi = 1.0
+
+Subscore_Perf = Raw_Perf_Score * psi
+    </div>
+
+    <h3>5.3 Categorization: Established Research vs. Internal Design Decisions</h3>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Module / Topic</th>
+                <th>Established Academic Literature</th>
+                <th>Proposed Design Decision</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>PSR Metric</strong></td>
+                <td>Bailey & López de Prado (2012)</td>
+                <td>Standardizing inputs to per-trade frequency (SR_trade, N_trades).</td>
+            </tr>
+            <tr>
+                <td><strong>DSR Reference Scaling</strong></td>
+                <td>Bailey & López de Prado (2014)</td>
+                <td>Dynamic cross-trial empirical variance calculation across search grid.</td>
+            </tr>
+            <tr>
+                <td><strong>n_trials Guardrails</strong></td>
+                <td>Harvey, Liu, & Zhu (2016)</td>
+                <td>Enforcing mandatory explicit `n_trials` with hard ValueError if < 2.</td>
+            </tr>
+            <tr>
+                <td><strong>Drawdown Engine</strong></td>
+                <td>Sweeney (1992) MAE Framework</td>
+                <td>Continuous tick/bar mark-to-market equity tracking with 25% DD knockout.</td>
+            </tr>
+            <tr>
+                <td><strong>Overfitting Framework</strong></td>
+                <td>Bailey et al. (2014), López de Prado (2018)</td>
+                <td>Reweighting Robustness to 35% and adding hard knockouts for DSR & PBO.</td>
+            </tr>
+            <tr>
+                <td><strong>Scoring Mechanics</strong></td>
+                <td>Keating & Shadwick (2002)</td>
+                <td>Exponential Asymmetry Penalty Factor (psi) scaling for asymmetric tails.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- PAGE 5 -->
+    <div class="page-break"></div>
+    <div class="header">
+        <h1>Technical Design Proposal (Cont.)</h1>
+        <div style="font-size: 8.5pt;">Section 6: Implementation Roadmap | References</div>
+    </div>
+
+    <h2>6. Implementation Roadmap</h2>
+    <ol>
+        <li><strong>Phase 1: Module 5 DSR/PSR Refactoring</strong>
+            <ul>
+                <li>Update evaluation module to enforce per-trade input parameters (SR_trade, N_trades).</li>
+                <li>Implement dynamic sigma_SR cross-trial standard deviation scaling.</li>
+                <li>Enforce mandatory `n_trials` keyword inputs and validation exceptions.</li>
+            </ul>
+        </li>
+        <li><strong>Phase 2: Mark-to-Market Equity & Drawdown Engine</strong>
+            <ul>
+                <li>Refactor strategy backtest harness to log continuous tick/bar mark-to-market unrealized equity paths.</li>
+                <li>Implement continuous MDD_MtM tracking and trade-level MAE logging.</li>
+            </ul>
+        </li>
+        <li><strong>Phase 3: Overfitting & Scoring Engine Integration</strong>
+            <ul>
+                <li>Integrate Combinatorially Symmetric Cross-Validation (CSCV) to calculate PBO metrics.</li>
+                <li>Implement Purged and Embargoed K-Fold splitters.</li>
+                <li>Update final score generation engine to apply the 100-point reweighted matrix, asymmetry penalties (psi), and hard knockouts.</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h2>References</h2>
+    <ul>
+        <li>Bailey, D. H., & López de Prado, M. (2012). The Sharpe ratio efficient frontier. <em>Journal of Risk</em>, 15(2), 3-44.</li>
+        <li>Bailey, D. H., & López de Prado, M. (2014). The Deflated Sharpe Ratio: Correcting for selection bias, backtest overfitting, and non-normality. <em>Journal of Portfolio Management</em>, 40(5), 94-107.</li>
+        <li>Bailey, D. H., Borwein, J., López de Prado, M., & Zhou, Q. J. (2014). Pseudo-mathematics and financial fraud: The case of backtest overfitting. <em>Notices of the American Mathematical Society</em>, 61(5), 458-471.</li>
+        <li>Harvey, C. R., Liu, Y., & Zhu, H. (2016). … and the cross-section of expected returns. <em>The Review of Financial Studies</em>, 29(1), 5-68.</li>
+        <li>Keating, C., & Shadwick, W. F. (2002). A universal performance measure. <em>Journal of Performance Measurement</em>, 6(3), 59-84.</li>
+        <li>López de Prado, M. (2018). <em>Advances in Financial Machine Learning</em>. John Wiley & Sons.</li>
+        <li>Mertens, E. (2002). Comments on the estimation of Sharpe ratios. <em>Working Paper, Institutional Repository - University of Basel</em>.</li>
+        <li>Pézier, J., & White, A. (2008). The maximum Sharpe ratio under skewness and kurtosis. <em>ICMA Centre Discussion Papers in Finance</em>, IC-2008-06.</li>
+        <li>Sortino, F. A., & van der Meer, R. (1991). Downside risk. <em>Journal of Portfolio Management</em>, 17(2), 27-31.</li>
+        <li>Sweeney, J. (1992). <em>Maximum Adverse Excursion: Analyzing the Risk-Reward Characteristics of Technical Trading Systems</em>. Technical Analysis of Stocks & Commodities.</li>
+    </ul>
+
+</body>
+</html>
+
+```

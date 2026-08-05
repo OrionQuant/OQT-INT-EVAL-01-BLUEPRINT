@@ -22,7 +22,7 @@ python main.py
 # → http://localhost:8000/docs  (Swagger)
 
 # 3. Test
-pytest tests/ -v          # 52/52 passing
+pytest tests/ -v          # 81/81 passing
 ```
 
 ## Primary workflow

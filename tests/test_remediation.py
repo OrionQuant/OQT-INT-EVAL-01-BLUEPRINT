@@ -255,7 +255,7 @@ class TestCappedPnlScoringPath:
         assert outlier.capped_pnl is not None
         assert outlier.capped_pnl < outlier.pnl
 
-        metrics, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=1)
+        metrics, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=2, sr_trials=[0.05, 0.06])
         # Net PnL on the scoring path must reflect the cap (not the raw 50k spike)
         assert metrics.growth.net_pnl < 50_000.0
 
@@ -292,7 +292,7 @@ class TestSeedStringRoundTrip:
         raw = (FIXTURES / "sample_trades.csv").read_bytes()
         rows, _, _, _ = ingest_file(raw, "s.csv")
         trades, _ = clean_raw_rows(rows, evaluations_dir=str(tmp_path))
-        metrics, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=1)
+        metrics, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=2, sr_trials=[0.05, 0.06])
 
         # Large seed that would lose precision as a JS Number (> 2^53)
         big = "9007199254740993"  # 2^53 + 1
@@ -335,8 +335,8 @@ class TestDsrPsrParameterRules:
         rows, _, _, _ = ingest_file(raw, "s.csv")
         trades, _ = clean_raw_rows(rows, evaluations_dir=str(tmp_path))
 
-        m1, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=1)
-        m50, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=50)
+        m1, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=2, sr_trials=[0.05, 0.06])
+        m50, _, _ = compute_all_metrics(trades, start_balance=10_000.0, n_trials=50, sr_trials=[0.05]*50)
         assert m1.risk_adj.probabilistic_sharpe_ratio is not None
         assert m50.risk_adj.probabilistic_sharpe_ratio is not None
         # Same N_obs → same PSR

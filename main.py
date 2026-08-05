@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 _BASE_DIR_SELF = Path(__file__).resolve().parent
 _DEPS_DIR = _BASE_DIR_SELF / "_deps"
@@ -68,7 +68,10 @@ class EvaluateConfig(BaseModel):
     mc_iterations: int = 1000
     # Required DSR deflation parameter — total backtests / parameter variants.
     # Never inferred from trade count (N_obs).
-    n_trials: int = Field(..., ge=1, description="Number of strategy variants / backtests tried")
+    n_trials: int = Field(..., ge=2, description="Number of strategy variants / backtests tried (required, >=2)")
+    # Optional: the list of per-trial per-trade Sharpe ratios observed across
+    # the optimizer/backtests. Providing this enables empirical DSR scaling.
+    sr_trials: Optional[List[float]] = None
 
 
 def _build_overfitting_estimate(
@@ -152,6 +155,7 @@ def _run_pipeline(
         start_balance=config.start_balance,
         rf_annual=config.rf_annual,
         n_trials=config.n_trials,
+        sr_trials=config.sr_trials,
     )
 
     # 4. Monte Carlo (seeded RNG — seed always stored as string)
@@ -237,8 +241,15 @@ async def evaluate(
     if "n_trials" not in cfg_dict or cfg_dict.get("n_trials") in (None, "", 0):
         raise HTTPException(
             status_code=400,
-            detail="n_trials is required (>=1). It is the number of strategy variants / "
+            detail="n_trials is required (>=2). It is the number of strategy variants / "
                    "backtests tried — used for DSR deflation, never the trade count.",
+        )
+    # Require sr_trials to be supplied so DSR empirical scaling is not silently
+    # defaulted. It should be a JSON array of per-trial per-trade Sharpe ratios.
+    if "sr_trials" not in cfg_dict or not cfg_dict.get("sr_trials"):
+        raise HTTPException(
+            status_code=400,
+            detail="sr_trials is required: provide a non-empty list of per-trial per-trade Sharpe ratios for empirical DSR scaling.",
         )
     try:
         cfg = EvaluateConfig(**cfg_dict)

@@ -90,6 +90,7 @@ class DrawdownMetrics(BaseModel):
     max_drawdown_duration_days: float
     ulcer_index: float
     recovery_factor: float
+    mtm_max_drawdown: Optional[float] = None
 
 
 class RiskAdjustedMetrics(BaseModel):
@@ -255,6 +256,7 @@ class PenaltiesApplied(BaseModel):
     cvar_10pct: float = 1.0
     mc_rr: float = 1.0
     n_50: float = 1.0
+    martingale: float = 1.0
     penalty_product: float = 1.0
 
 

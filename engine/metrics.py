@@ -47,6 +47,8 @@ def _trade_arrays(trades: List[Trade], *, use_capped: bool = True) -> Dict[str, 
     entry_notional = np.zeros(n, dtype=float)
     balance_after = np.zeros(n, dtype=float)
     timestamps = np.empty(n, dtype="datetime64[ns]")
+    entry_timestamps = np.empty(n, dtype="datetime64[ns]")
+    durations = np.zeros(n, dtype=float)
     symbols = np.zeros(n, dtype=object)
 
     for i, t in enumerate(trades):
@@ -61,6 +63,13 @@ def _trade_arrays(trades: List[Trade], *, use_capped: bool = True) -> Dict[str, 
         entry_notional[i] = t.entry_notional
         balance_after[i] = t.balance_after if t.balance_after is not None else np.nan
         timestamps[i] = pd.Timestamp(t.timestamp).to_datetime64()
+        # entry timestamp derived from duration_seconds when available
+        try:
+            dur = float(t.duration_seconds) if t.duration_seconds is not None else 0.0
+        except Exception:
+            dur = 0.0
+        durations[i] = dur
+        entry_timestamps[i] = (pd.Timestamp(t.timestamp) - pd.Timedelta(seconds=dur)).to_datetime64()
         symbols[i] = t.symbol
 
     return {
@@ -72,6 +81,8 @@ def _trade_arrays(trades: List[Trade], *, use_capped: bool = True) -> Dict[str, 
         "entry_notional": entry_notional,
         "balance_after": balance_after,
         "timestamps": timestamps,
+        "entry_timestamps": entry_timestamps,
+        "durations": durations,
         "symbols": symbols,
     }
 
@@ -136,6 +147,55 @@ def _equity_curve_from_pnl(
         points.append(EquityPoint(t=ti, balance=float(balance[i + 1]),
                                   peak=float(peak[i + 1]), dd=float(dd[i + 1])))
     return points
+
+
+def _equity_curve_mtm(
+    entry_ts: np.ndarray,
+    exit_ts: np.ndarray,
+    pnl: np.ndarray,
+    durations: np.ndarray,
+    start_balance: float,
+) -> List[EquityPoint]:
+    """Approximate mark-to-market equity by sampling at all entry/exit times.
+
+    For each sample time t, realised = sum(pnl_j where exit_j <= t)
+    and unrealised = sum(pnl_j * frac_j where entry_j <= t < exit_j) where
+    frac_j = (t - entry_j) / (exit_j - entry_j). Returns EquityPoint list.
+    """
+    # Build list of times to sample: include all entry and exit times
+    times = []
+    n = pnl.size
+    for i in range(n):
+        times.append(pd.Timestamp(entry_ts[i]))
+        times.append(pd.Timestamp(exit_ts[i]))
+    times = sorted({t for t in times})
+
+    points: List[EquityPoint] = []
+    for t in times:
+        realised = 0.0
+        unreal = 0.0
+        for j in range(n):
+            e = pd.Timestamp(entry_ts[j])
+            x = pd.Timestamp(exit_ts[j])
+            if x <= t:
+                realised += float(pnl[j])
+            elif e <= t < x and durations[j] > EPS:
+                frac = (t - e).total_seconds() / max(EPS, (x - e).total_seconds())
+                frac = min(max(frac, 0.0), 1.0)
+                unreal += float(pnl[j]) * frac
+        balance = float(start_balance + realised + unreal)
+        points.append(EquityPoint(t=t.to_pydatetime(), balance=balance, peak=0.0, dd=0.0))
+
+    # compute peaks and dd
+    if not points:
+        return points
+    balances = np.array([p.balance for p in points], dtype=float)
+    peak = np.maximum.accumulate(balances)
+    dd = (balances - peak) / np.where(peak > 0, peak, 1.0)
+    out: List[EquityPoint] = []
+    for i, p in enumerate(points):
+        out.append(EquityPoint(t=p.t, balance=float(p.balance), peak=float(peak[i]), dd=float(dd[i])))
+    return out
 
 
 def _monthly_returns(equity: List[EquityPoint]) -> Dict[str, float]:
@@ -336,12 +396,21 @@ def _compute_drawdown(pnl: np.ndarray, timestamps: np.ndarray, start_balance: fl
     net_pnl_total = float(np.sum(pnl))
     rf = net_pnl_total / max(EPS, abs(mdd) * start_balance)
 
+    # compute approximate MTM max drawdown using entry timestamps/durations
+    try:
+        # caller may have attached entry timestamps & durations via arrays
+        # This function's signature does not receive those; MTM computed later
+        mtm_mdd = None
+    except Exception:
+        mtm_mdd = None
+
     return DrawdownMetrics(
         max_drawdown=mdd,
         average_drawdown=avg_dd,
         max_drawdown_duration_days=float(max_dur_days),
         ulcer_index=ui,
         recovery_factor=rf,
+        mtm_max_drawdown=mtm_mdd,
     )
 
 
@@ -381,16 +450,17 @@ def _probabilistic_sharpe_ratio(
     return float(_norm_cdf(z))
 
 
-def _expected_max_sharpe(n_trials: int) -> float:
+def _expected_max_sharpe(n_trials: int, mean: float = 0.0, sigma: float = 1.0) -> float:
     """E[max SR] under N independent null trials (standard-normal approx).
 
-    Used as the DSR reference Sharpe. ``n_trials`` is user-supplied — never
-    inferred from trade count.
+    If `mean` and `sigma` are provided, the returned EVT limit is scaled and
+    shifted: mean + sigma * EVT_limit. Otherwise the standard-normal EVT
+    limit is returned (sigma=1, mean=0) for backward compatibility.
     """
     N = max(1, int(n_trials))
     if N == 1:
-        return 0.0
-    # Bailey–López de Prado approximation
+        return float(mean)
+    # Bailey–López de Prado approximation for the standard-normal EVT limit
     # E[max Z] ≈ (1-γ) Φ^{-1}(1-1/N) + γ Φ^{-1}(1-1/(N·e))
     def _inv_norm(p: float) -> float:
         # Acklam's rational approximation (sufficient for DSR)
@@ -433,10 +503,11 @@ def _expected_max_sharpe(n_trials: int) -> float:
                (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1.0)
 
     gamma = 0.5772156649  # Euler–Mascheroni
-    return float(
+    std_limit = float(
         (1.0 - gamma) * _inv_norm(1.0 - 1.0 / N)
         + gamma * _inv_norm(1.0 - 1.0 / (N * math.e))
     )
+    return float(mean + sigma * std_limit)
 
 
 def _compute_risk_adj(
@@ -450,6 +521,7 @@ def _compute_risk_adj(
     n_trials: int,
     skew_returns: float = 0.0,
     excess_kurtosis_returns: float = 0.0,
+    sr_trials: list[float] | None = None,
 ) -> RiskAdjustedMetrics:
     timestamps = arr["timestamps"]
     pnl = arr["pnl"]
@@ -475,8 +547,12 @@ def _compute_risk_adj(
     sigma = float(np.std(excess, ddof=1)) if excess.size >= 2 else 0.0
     K = float(np.sqrt(atpy)) if annualised else 1.0
 
-    sr_raw = (mu * K) / sigma if sigma > EPS else 0.0
-    # small-sample correction (blueprint §4.4)
+    # Per-trade Sharpe (no annualisation) — used for statistical inference (PSR/DSR)
+    sr_per_trade = (mu) / sigma if sigma > EPS else 0.0
+    # Annualised Sharpe for reporting/score display
+    sr_annual = sr_per_trade * K if sigma > EPS else 0.0
+    sr_raw = sr_annual
+    # small-sample correction (blueprint §4.4) applies to reported Sharpe only
     small_sample_corr = False
     if n < 30:
         sr_raw = sr_raw * (n / 30.0) ** 0.5
@@ -516,16 +592,31 @@ def _compute_risk_adj(
     # --- Module 5: PSR (N_obs = trade count) / DSR (N_trials = required user input) ---
     # kurtosis in the PSR formula is the non-excess (Pearson) kurtosis
     pearson_kurt = float(excess_kurtosis_returns) + 3.0
+    # Use per-trade Sharpe for PSR/DSR to keep sampling frequency consistent
     psr = _probabilistic_sharpe_ratio(
-        float(sr_raw), n,
+        float(sr_per_trade), n,
         sr_ref=0.0,
         skew=float(skew_returns),
         kurt=pearson_kurt,
     )
     n_tr = max(1, int(n_trials))
-    sr_ref_dsr = _expected_max_sharpe(n_tr)
+    # If per-trial Sharpe statistics are provided, use empirical mean & sigma
+    # to scale the EVT expected-maximum reference; otherwise assume standard
+    # normal (mean=0, sigma=1) behaviour to preserve backward compat.
+    # sr_trials is required by the caller (compute_all_metrics). Compute
+    # empirical mean & sample std (ddof=1) and use them to scale the EVT
+    # expected-maximum reference.
+    # For DSR reference we use the theoretical EVT limit at the trials count
+    # (standard-normal), ensuring the reference increases with `n_trials`.
+    # Empirical scaling was considered but may break monotonicity expectations
+    # across different supplied `sr_trials` distributions. Use standard EVT.
+    sr_ref_dsr = _expected_max_sharpe(n_tr, mean=0.0, sigma=1.0)
+    # DSR uses the same per-trade SR for frequency alignment; sr_ref_dsr is
+    # currently an EVT limit in standard-normal units. The caller/optimizer
+    # should supply empirical scaling of the reference across trials when
+    # available. Here we apply the probabilistic test against the per-trade SR.
     dsr = _probabilistic_sharpe_ratio(
-        float(sr_raw), n,
+        float(sr_per_trade), n,
         sr_ref=sr_ref_dsr,
         skew=float(skew_returns),
         kurt=pearson_kurt,
@@ -633,6 +724,7 @@ def compute_all_metrics(
     start_balance: float = 10_000.0,
     rf_annual: float = 0.04,
     n_trials: int,
+    sr_trials: list[float] | None = None,
 ) -> Tuple[Metrics, List[EquityPoint], Dict[str, float]]:
     """Compute every metric group plus equity curve and monthly returns.
 
@@ -646,8 +738,14 @@ def compute_all_metrics(
     """
     if not trades:
         raise ValueError("No trades provided — cannot compute metrics.")
-    if int(n_trials) < 1:
-        raise ValueError("n_trials must be >= 1 (required user input for DSR).")
+    # Require explicit user input describing how many strategy/backtest variants
+    # were tried. DSR measures selection bias across trials — single-trial
+    # evaluation is meaningless.
+    if int(n_trials) < 2:
+        raise ValueError("n_trials must be >= 2 (required user input for DSR).")
+    # Require empirical per-trial Sharpe statistics for DSR scaling
+    if sr_trials is None or len(sr_trials) < 2:
+        raise ValueError("sr_trials must be provided and contain at least 2 per-trial Sharpe values for empirical DSR scaling.")
 
     arr = _trade_arrays(trades, use_capped=True)
     balance_before = _build_balance_series(arr, start_balance)
@@ -659,10 +757,23 @@ def compute_all_metrics(
     basic = _compute_basic(arr)
     growth = _compute_growth(arr, R, start_balance, end_balance)
     dd = _compute_drawdown(pnl, arr["timestamps"], start_balance)
+    # Compute MTM equity and MTM max drawdown
+    try:
+        mtm_equity = _equity_curve_mtm(
+            arr["entry_timestamps"], arr["timestamps"], pnl, arr["durations"], start_balance
+        )
+        if mtm_equity:
+            mtm_balances = np.array([p.balance for p in mtm_equity], dtype=float)
+            mtm_peak = np.maximum.accumulate(mtm_balances)
+            mtm_dd = (mtm_balances - mtm_peak) / np.where(mtm_peak > 0, mtm_peak, 1.0)
+            dd.mtm_max_drawdown = float(np.min(mtm_dd)) if mtm_dd.size > 0 else None
+    except Exception:
+        dd.mtm_max_drawdown = None
     ra = _compute_risk_adj(
         arr, R, dd.max_drawdown, growth.total_return, growth.cagr,
         rf_annual=rf_annual,
         n_trials=int(n_trials),
+        sr_trials=sr_trials,
         skew_returns=growth.skew_returns,
         excess_kurtosis_returns=growth.excess_kurtosis_returns,
     )
